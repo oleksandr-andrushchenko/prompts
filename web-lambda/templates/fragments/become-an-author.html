@@ -1,0 +1,20 @@
+<section class="card shadow-sm mb-4 text-bg-warning">
+    <div class="card-body">
+        <h2 class="h4 card-title">
+            <i class="bi bi-star"></i>
+            Become an author
+        </h2>
+
+        <p class="card-text">
+            Share your ideas and earn money from your content.
+        </p>
+
+        <a href="{{ url('new-prompt') if cur_user else url('login', redirect_url=url('new-prompt')) }}"
+           class="btn btn-dark bi bi-pencil-fill">
+            Write a prompt
+        </a>
+        <a href="{{ url("earn") }}" class="btn btn-dark btn-sm bi bi-currency-dollar">
+            Earn with us
+        </a>
+    </div>
+</section>

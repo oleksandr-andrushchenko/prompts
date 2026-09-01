@@ -1,0 +1,7 @@
+User-agent: *
+
+# --- ALLOW ALL BY DEFAULT ---
+Allow: /
+
+# --- BLOCK QUERY PARAMETERS (duplicates, filters, tracking) ---
+Disallow: /*?

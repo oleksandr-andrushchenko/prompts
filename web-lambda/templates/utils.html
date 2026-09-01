@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+
+{% set title = "Utils" %}
+{% set meta_robots = "noindex, nofollow" %}
+{% set meta_title = title ~ " | " ~ site_name %}
+{% set meta_canonical_url = url("utils", absolute=True) %}
+
+{% block breadcrumbs %}
+    {% with breadcrumbs = {"Home": url("index"), (title): None} %}
+        {% include "fragments/breadcrumbs.html" %}
+    {% endwith %}
+{% endblock %}
+
+{% block content %}
+    <h1>{{ title }}</h1>
+
+    <div class="row">
+        {% if check_auth(cur_user, Permission.GENERATE_SITEMAP) %}
+            <div class="{{ {"def": 4} | col_classes }}">
+                <section class="border rounded p-4 mb-4 bg-light">
+                    <h2 class="h4 mb-2">Generate Sitemap</h2>
+
+                    <p class="small text-muted mb-3">
+                        Generate the latest sitemap.xml and notify search engines about updated pages.
+                        Use this after publishing or updating content to improve indexing speed.
+                    </p>
+
+                    <form id="generate-sitemap-form" novalidate>
+                        <button class="btn btn-primary" type="submit">Generate & Notify</button>
+                    </form>
+                </section>
+
+                <script>
+                  document.addEventListener("DOMContentLoaded", () => {
+                    handleFormSubmit("#generate-sitemap-form", {{ url("generate-sitemap", absolute=True) | tojson }}, {
+                      method: "POST",
+                      onSuccess: (res) => `Sitemap generated!<br>URLs count: ${res.urls_count}, Sitemap URL: <a href="${res.sitemap_url}" target="_blank">${res.sitemap_url}</a>`,
+                    })
+                  })
+                </script>
+            </div>
+        {% endif %}
+
+        {% if check_auth(cur_user, Permission.DROP_CDN_CACHE) %}
+            <div class="{{ {"def": 4} | col_classes }}">
+                <section class="border rounded p-4 mb-4 bg-light">
+                    <h2 class="h4 mb-2">Drop CDN Cache</h2>
+
+                    <p class="small text-muted mb-3">
+                        Invalidate CloudFront Cache.
+                    </p>
+
+                    <form id="drop-cdn-cache-form" novalidate>
+                        <button class="btn btn-primary" type="submit">Drop</button>
+                    </form>
+                </section>
+
+                <script>
+                  document.addEventListener("DOMContentLoaded", () => {
+                    handleFormSubmit("#drop-cdn-cache-form", {{ url("drop-cdn-cache", absolute=True) | tojson }}, {
+                      method: "POST",
+                      onSuccess: (res) => `CDN cache dropped!<br>Items count: ${res.items_count}`,
+                    })
+                  })
+                </script>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,208 @@
+{% extends "layout.html" %}
+{% set layout_assets = {"masonry": true, "tagify": true} %}
+
+
+{% set val_map = {
+    (PromptQueryType.LATEST): {"title": "Latest", "subtitle": "Recently added"},
+    (PromptQueryType.POPULAR): {"title": "Popular", "subtitle": "Most popular"},
+    (PromptStatus.PUBLISHED): {"title": None, "subtitle": None},
+    (PromptStatus.UNPUBLISHED): {"title": "Unpublished", "subtitle": "Unpublished"},
+    (PromptStatus.REJECTED): {"title": "Rejected", "subtitle": "Rejected"}
+} %}
+
+{% set title = ([val_map[prompt_query.type]["title"]] + (prompt_query.tags if prompt_query.tags else [site_about]) + [val_map[prompt_query.status]["title"]] + ["Prompts"]) | select | join(" ") | title %}
+{% set meta_robots = "noindex, follow" if prompt_query.status != PromptStatus.PUBLISHED else "index, follow" %}
+{% set subtitle = ([val_map[prompt_query.type]["subtitle"]]  + prompt_query.tags + [val_map[prompt_query.status]["subtitle"]] + ["Prompts"]) | select | join(" ") | title %}
+{% set meta_title = title ~ " | " ~ site_name %}
+{% set meta_canonical_url = prompts_url(query=prompt_query, tags=prompt_query.tags|sort, absolute=True) %}
+{% set meta_desc = [title, subtitle, site_desc] | select | join('. ') | truncate(155, True, '...') %}
+{% block meta_schema %}
+    {% set items = namespace(values=[]) %}
+    {% for prompt in prompts %}
+        {% set items.values = items.values + [{
+            "@type": "ListItem",
+            "position": loop.index,
+            "name": prompt.title,
+            "url": prompt_url(prompt, absolute=True)
+        }] %}
+    {% endfor %}
+    {% set breadcrumb_items = namespace(values=[
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": url("index", absolute=True)},
+        {"@type": "ListItem", "position": 2, "name": "Prompts", "item": prompts_url(absolute=True)}
+    ]) %}
+    {% set breadcrumb_position = 2 %}
+    {% if prompt_query.type and prompt_query.type != PromptQueryDTO.DEFAULT_TYPE %}
+        {% set breadcrumb_position = breadcrumb_position + 1 %}
+        {% set breadcrumb_items.values = breadcrumb_items.values + [{
+            "@type": "ListItem",
+            "position": breadcrumb_position,
+            "name": prompt_query.type | title,
+            "item": prompts_url(type=prompt_query.type, absolute=True)
+        }] %}
+    {% endif %}
+    {% set tag_path = namespace(values=[]) %}
+    {% for tag in prompt_query.tags %}
+        {% set tag_path.values = tag_path.values + [tag] %}
+        {% set breadcrumb_position = breadcrumb_position + 1 %}
+        {% set breadcrumb_items.values = breadcrumb_items.values + [{
+            "@type": "ListItem",
+            "position": breadcrumb_position,
+            "name": tag | title,
+            "item": prompts_url(tags=tag_path.values, type=prompt_query.type, absolute=True)
+        }] %}
+    {% endfor %}
+    {% if prompt_query.status and prompt_query.status != PromptQueryDTO.DEFAULT_STATUS %}
+        {% set breadcrumb_position = breadcrumb_position + 1 %}
+        {% set breadcrumb_items.values = breadcrumb_items.values + [{
+            "@type": "ListItem",
+            "position": breadcrumb_position,
+            "name": prompt_query.status | title,
+            "item": prompts_url(type=prompt_query.status, absolute=True)
+        }] %}
+    {% endif %}
+    {{- {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "@id": meta_canonical_url,
+        "url": meta_canonical_url,
+        "name": title,
+        "description": meta_desc,
+        "inLanguage": "en",
+        "mainEntity": {
+            "@type": "ItemList",
+            "numberOfItems": items.values | length,
+            "itemListElement": items.values
+        },
+        "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": breadcrumb_items.values
+        }
+    } | tojson | safe -}}
+{% endblock %}
+
+{% block breadcrumbs %}
+    {% set breadcrumbs = {"Home": url("index"), "Prompts": prompts_url()} %}
+
+    {% if prompt_query.type and prompt_query.type != PromptQueryDTO.DEFAULT_TYPE %}
+        {% set breadcrumbs = breadcrumbs.update({prompt_query.type | title: prompts_url(type=prompt_query.type)}) or breadcrumbs %}
+    {% endif %}
+
+    {% set ns = namespace(path_tags=[]) %}
+    {% for tag in prompt_query.tags %}
+        {% set ns.path_tags = ns.path_tags + [tag] %}
+        {% set breadcrumbs = breadcrumbs.update({tag | title: prompts_url(tags=ns.path_tags, type=prompt_query.type)}) or breadcrumbs %}
+    {% endfor %}
+
+    {% if prompt_query.status and prompt_query.status != PromptQueryDTO.DEFAULT_STATUS %}
+        {% set breadcrumbs = breadcrumbs.update({prompt_query.status | title: prompts_url(type=prompt_query.status)}) or breadcrumbs %}
+    {% endif %}
+
+    {% set last_key = (breadcrumbs.keys() | list)[-1] %}
+    {% set breadcrumbs = breadcrumbs.update({ last_key: None }) or breadcrumbs %}
+
+    {% include "fragments/breadcrumbs.html" %}
+{% endblock %}
+
+{% block content %}
+    <h1>{{ title }}</h1>
+    <p class="small text-secondary">{{ subtitle }}</p>
+
+    <form action="{{ prompts_url() }}" method="get" class="d-flex flex-wrap align-items-center gap-3 mb-4">
+        <h2 class="h5 mb-0 text-decoration-underline bi bi-filter"> Filter prompts</h2>
+
+        <input type="hidden" name="type" value="{{ prompt_query.type }}">
+        <input type="hidden" name="status" value="{{ prompt_query.status }}">
+
+        <div class="d-flex align-items-center gap-2">
+            <small class="text-secondary bi bi-sort-down"> Show:</small>
+            <div class="btn-group btn-group-sm" role="group">
+                {% set is_latest = prompt_query.type == PromptQueryType.LATEST %}
+                <a href="{{ prompts_url(**prompt_query.get_dict({"type": None if is_latest else PromptQueryType.LATEST})) }}"
+                   class="btn {% if is_latest %}btn-secondary active{% else %}btn-light{% endif %} bi bi-clock{{ "-fill" if is_latest else "" }}">
+                    {{ PromptQueryType.LATEST | title }} first
+                </a>
+                {% set is_popular = prompt_query.type == PromptQueryType.POPULAR %}
+                <a href="{{ prompts_url(**prompt_query.get_dict({"type": None if is_popular else PromptQueryType.POPULAR})) }}"
+                   class="btn {% if is_popular %}btn-primary active{% else %}btn-light{% endif %} bi bi-star{{ "-fill" if is_popular else "" }}">
+                    {{ PromptQueryType.POPULAR | title }} first
+                </a>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <small class="text-secondary bi bi-tags"> Filter by tags:</small>
+            {% with url=url("get-tags", absolute=True),
+                            value=prompt_query.tags,
+                            tag_items=prompt_query_tag_items,
+                            class_name="w-auto",
+                            auto_submit=False,
+                            inject_hidden=True %}
+                {% include "fragments/tags-input.html" %}
+            {% endwith %}
+
+            <button class="btn btn-light btn-sm bi bi-search" type="submit"> Search</button>
+        </div>
+
+        {% if cur_user and check_auth(cur_user, Permission.READ_NON_PUBLISHED_PROMPT) %}
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-secondary bi bi-toggle2-on"> Filter by status:</small>
+                <div class="btn-group btn-group-sm" role="group">
+                    {% set is_published = prompt_query.status == PromptStatus.PUBLISHED %}
+                    <a href="{{ prompts_url(**prompt_query.get_dict({"status": None if is_published else PromptStatus.PUBLISHED})) }}"
+                       class="btn {% if is_published %}btn-success active{% else %}btn-light{% endif %}">
+                        {{ PromptStatus.PUBLISHED | title }}
+                    </a>
+
+                    {% set is_unpublished = prompt_query.status == PromptStatus.UNPUBLISHED %}
+                    <a href="{{ prompts_url(**prompt_query.get_dict({"status": None if is_unpublished else PromptStatus.UNPUBLISHED})) }}"
+                       class="btn {% if is_unpublished %}btn-warning active{% else %}btn-light{% endif %}">
+                        {{ PromptStatus.UNPUBLISHED | title }}
+                    </a>
+
+                    {% set is_rejected = prompt_query.status == PromptStatus.REJECTED %}
+                    <a href="{{ prompts_url(**prompt_query.get_dict({"status": None if is_rejected else PromptStatus.REJECTED})) }}"
+                       class="btn {% if is_rejected %}btn-danger active{% else %}btn-light{% endif %}">
+                        {{ PromptStatus.REJECTED | title }}
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if prompt_query.has_params() %}
+            <div>
+                <a href="{{ prompts_url() }}" class="btn btn-light btn-sm bi bi-x-lg"> Reset</a>
+            </div>
+        {% endif %}
+
+        {% if tag and cur_user and check_auth(cur_user, Permission.UPDATE_TAG) %}
+            <a href="{{ url("edit-tag", slug=prompt_query.tags[0]) }}"
+               class="btn btn-light btn-sm bi bi-pencil">
+                Edit tag
+            </a>
+        {% endif %}
+    </form>
+
+    {% if prompts %}
+        <section id="prompts" class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3"
+                 data-masonry='{"percentPosition": true }'>
+            {% with tags=prompt_query.tags %}
+                {% include "fragments/tag-subscription.html" %}
+            {% endwith %}
+
+            {% with h_tag_size=2,
+                prompt_img_sizes={"1400px": "196px", "1200px": "166px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
+                {% include "fragments/prompts.html" %}
+            {% endwith %}
+        </section>
+
+        {% with limit=prompt_query.limit,
+            offset=prompts[-1].offset,
+            url=url("prompts-fragment", absolute=True, **prompt_query.get_dict()),
+            container="#prompts",
+            auto_click=True %}
+            {% include "fragments/load-more-button.html" %}
+        {% endwith %}
+    {% else %}
+        <div>N/A</div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% set layout_assets = {"validation": true} %}
+
+
+{% set title = ("Edit " ~ user.name) | trim %}
+{% set meta_robots = "noindex, nofollow" %}
+{% set meta_title = title ~ " " ~ site_name %}
+{% set meta_canonical_url = url("edit-user", user_id=user.id, absolute=True) %}
+
+{% block breadcrumbs %}
+    {% with breadcrumbs = {"Home": url("index"), "Users": users_url(), (user.name): user_url(user), "Edit": None} %}
+        {% include "fragments/breadcrumbs.html" %}
+    {% endwith %}
+{% endblock %}
+
+{% block content %}
+    <h1>{{ title }}</h1>
+    <p class="small text-secondary">Update profile</p>
+    {% include "fragments/user-form.html" %}
+{% endblock %}

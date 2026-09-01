@@ -1,0 +1,17 @@
+services:
+  scripts:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DYNAMODB_ENDPOINT: "http://dynamodb:8000"
+      APP_STAGE: local
+      APP_ENV: dev
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+      DYNAMODB_TABLE: app
+      FUNCTION_TEMPLATES_DIR: "/app/api-lambda/templates"
+    volumes:
+      - ./:/app

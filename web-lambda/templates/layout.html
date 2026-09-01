@@ -1,0 +1,325 @@
+{% set index_url = url("index") %}
+{% set current_route = request.scope.get("route_name") %}
+{% set layout_assets = layout_assets | default({}) %}
+{% set prompts_active = current_route in ["prompts", "prompt", "edit-prompt", "prompts-by-slugs", "prompt-by-slugs", "edit-tag"] %}
+{% set users_active = current_route in ["users", "users-by-slugs", "user", "edit-user", "user-by-slug"] %}
+{% set css_filenames = [
+    "https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css",
+    "https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;700&display=swap",
+    static_url('styles.css', _=css_cache_counter),
+] %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    {% if google_analytics_id %}
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_analytics_id | urlencode }}"></script>
+        <script>
+          window.dataLayer = window.dataLayer || []
+
+          function gtag() {
+            dataLayer.push(arguments)
+          }
+
+          gtag("js", new Date())
+          gtag("config", {{ google_analytics_id | tojson }})
+        </script>
+    {% endif %}
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>{{ meta_title or site_title }}</title>
+    <meta name="description" content="{{ (meta_desc or site_desc) | truncate(155, True, '...') }}"/>
+    <meta name="author" content="{{ meta_author }}"/>
+    {% if meta_rating_value is defined %}
+        <meta name="ratingValue" content="{{ meta_rating_value }}"/>
+        <meta name="ratingCount" content="{{ meta_rating_count }}"/>
+        <meta name="ratingBest" content="5"/>
+        <meta name="ratingWorst" content="0"/>
+    {% endif %}
+    {% if meta_robots %}
+        <meta name="robots" content="{{ meta_robots }}">
+    {% endif %}
+    {% if meta_canonical_url %}
+        <link rel="canonical" href="{{ meta_canonical_url }}">
+    {% endif %}
+
+    <meta name="application-name" content="{{ site_name }}"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-title" content="{{ site_name }}"/>
+
+    {% set social_url = og_url or meta_canonical_url or url("index", absolute=True) %}
+    {% set image_filename = og_img_filename or meta_img_filename or site_img_filename %}
+    {% set social_image_url = image_filename if image_filename and (image_filename.startswith('http://') or image_filename.startswith('https://')) else static_url(image_filename, absolute=True) if image_filename else None %}
+    <meta property="og:title" content="{{ og_title or meta_title or site_title }}"/>
+    <meta property="og:description" content="{{ og_desc or meta_desc or site_desc }}"/>
+    <meta property="og:type" content="{{ og_type or "website" }}"/>
+    <meta property="og:url" content="{{ social_url }}"/>
+    <meta property="og:site_name" content="{{ site_name }}"/>
+    {% if social_image_url %}
+        <meta property="og:image" content="{{ social_image_url }}"/>
+        <meta property="og:image:alt"
+              content="{{ og_img_alt or meta_img_alt or meta_title or site_img_title or site_title }}"/>
+    {% endif %}
+    {% set img_width, img_height = img_dims(image_filename) %}
+    {% if img_width and img_height %}
+        <meta property="og:image:width" content="{{ img_width }}"/>
+        <meta property="og:image:height" content="{{ img_height }}"/>
+    {% endif %}
+
+    <meta name="twitter:card" content="{{ twitter_card or "summary_large_image" }}"/>
+    <meta name="twitter:title" content="{{ og_title or meta_title or site_title }}"/>
+    <meta name="twitter:description" content="{{ og_desc or meta_desc or site_desc }}"/>
+    {% if social_image_url %}
+        <meta name="twitter:image" content="{{ social_image_url }}"/>
+    {% endif %}
+
+    {% if og_type == "prompt" %}
+        {% if prompt_og_author %}
+            <meta property="prompt:author" content="{{ prompt_og_author }}"/>{% endif %}
+        {% if prompt_og_published_time %}
+            <meta property="prompt:published_time" content="{{ prompt_og_published_time }}"/>{% endif %}
+        {% if prompt_og_modified_time %}
+            <meta property="prompt:modified_time" content="{{ prompt_og_modified_time }}"/>{% endif %}
+        {% for tag in prompt_og_tags %}
+            <meta property="prompt:tag" content="{{ tag }}"/>{% endfor %}
+    {% endif %}
+
+    <script type="application/ld+json">{% block meta_schema %}
+    {{- {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "@id": meta_canonical_url or url("index", absolute=True),
+        "url": meta_canonical_url or url("index", absolute=True),
+        "name": meta_title or site_title,
+        "description": meta_desc or site_desc,
+        "inLanguage": "en"
+    } | tojson | safe -}}
+{% endblock %}</script>
+
+    {% if show_favicon %}
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="{{ static_url("favicon-96x96.png") }}" sizes="96x96"/>
+        <link rel="icon" type="image/svg+xml" href="{{ static_url("favicon.svg") }}"/>
+        <link rel="shortcut icon" href="{{ static_url("favicon.ico") }}"/>
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ static_url("apple-touch-icon.png") }}"/>
+        <meta name="apple-mobile-web-app-title" content="{{ site_name }}"/>
+        <link rel="manifest" href="{{ static_url("site.webmanifest") }}"/>
+    {% endif %}
+
+    {% for css_filename in css_filenames %}
+        <link rel="stylesheet" href="{{ css_filename }}">
+    {% endfor %}
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+
+<header>
+    <nav class="navbar navbar-expand-lg bg-dark" data-bs-theme="dark">
+        <div class="container">
+            <a class="navbar-brand" style="outline:none" href="{{ index_url }}">
+                {{ site_name }} <i class="bi bi-{{ site_icon }}"></i>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar"
+                    aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbar">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link{% if current_route == "tags" %} active{% endif %}"
+                           href="{{ url("tags") }}"{% if current_route == "tags" %}
+                           aria-current="page"{% endif %}>Tags</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link{% if prompts_active %} active{% endif %}" href="{{ prompts_url() }}"
+                                {% if prompts_active %} aria-current="page"{% endif %}>Prompts</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link{% if users_active %} active{% endif %}" href="{{ users_url() }}"
+                                {% if users_active %} aria-current="page"{% endif %}>Users</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link bi bi-currency-dollar{% if current_route == "earn" %} active{% endif %}"
+                           href="{{ url("earn") }}"{% if current_route == "earn" %} aria-current="page"{% endif %}>
+                            Earn</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link{% if current_route == "contacts" %} active{% endif %}"
+                           href="{{ url("contacts") }}"{% if current_route == "contacts" %}
+                           aria-current="page"{% endif %}>Contacts</a>
+                    </li>
+                    {% if cur_user and check_auth(cur_user, Permission.UTILS) %}
+                        <li class="nav-item">
+                            <a class="nav-link{% if current_route == "utils" %} active{% endif %}"
+                               href="{{ url("utils") }}"{% if current_route == "utils" %}
+                               aria-current="page"{% endif %}>Utils</a>
+                        </li>
+                    {% endif %}
+                </ul>
+
+                <ul class="navbar-nav">
+                    {% if cur_user %}
+                        {% if check_auth(cur_user, Permission.CREATE_PROMPT) %}
+                            <li class="nav-item">
+                                <a class="nav-link{% if cur_user.status == UserStatus.BANNED %} disabled{% endif %} bi bi-pencil-fill"
+                                   href="{{ url("new-prompt") }}">
+                                    New prompt
+                                </a>
+                            </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link bi bi-person-circle" href="{{ user_url(cur_user) }}">
+                                {{ cur_user.name }}
+                                {% if check_auth(cur_user, Permission.ROOT) %}
+                                    <span class="badge text-bg-success">root</span>
+                                {% endif %}
+                                {% if cur_user.status == UserStatus.BANNED %}
+                                    <span class="badge text-bg-danger" title="{{ cur_user.comment }}">banned</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url("logout") }}">
+                                Sign out <i class="bi bi-box-arrow-right"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link bi bi-pencil-fill"
+                               href="{{ url("login", redirect_url=url("new-prompt")) }}">
+                                New prompt
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link bi bi-box-arrow-in-right" href="{{ url('login') }}"> Sign in</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<main class="pb-3 {{ main_class | default("container") }}">
+    {% block breadcrumbs %}{% endblock %}
+
+    <!-- Cookie alert -->
+    <div class="alert alert-secondary alert-dismissible fade fixed-bottom m-0" role="alert" id="cookie-alert">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div>
+                This website uses cookies to ensure you get the best experience.
+                <a href="{{ url('policy') }}" class="alert-link">Learn more</a>.
+            </div>
+            <button type="button" class="btn btn-dark btn-sm bi bi-check2-all" id="accept-cookies"> Accept</button>
+        </div>
+    </div>
+
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="mt-auto bg-light">
+    <div class="container py-1 d-flex flex-column flex-md-row justify-content-between align-items-center text-center text-md-start">
+        <ul class="nav justify-content-center mb-2 mb-md-0">
+            <li class="nav-item">
+                <a class="nav-link px-2 text-muted bi bi-currency-dollar" href="{{ url("earn") }}"> Earn</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link px-2 text-muted" href="{{ url("contacts") }}">Contacts</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link px-2 text-muted" href="{{ url("policy") }}">Privacy</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link px-2 text-muted" href="{{ url("rules") }}">Rules</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link px-2 text-muted" href="{{ url("terms") }}">Terms</a>
+            </li>
+        </ul>
+
+        {% if contact_socials %}
+            <div class="d-flex justify-content-center justify-content-md-end gap-3">
+                {% for contact_social in contact_socials %}
+                    <a href="{{ contact_social.url }}" class="link-dark fs-4 bi bi-{{ contact_social.icon }}"
+                       target="_blank" rel="noopener noreferrer"></a>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="text-muted small mb-2 mb-md-0">
+            &copy; {{ footer_current_year }} {{ site_name }}
+        </div>
+    </div>
+</footer>
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+      as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"></noscript>
+<!--bs-->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
+        crossorigin="anonymous" defer></script>
+<!--form validation-->
+{% if layout_assets.validation | default(false) %}
+    <script src="https://unpkg.com/just-validate@latest/dist/just-validate.production.min.js" defer></script>
+{% endif %}
+{% if layout_assets.tagify | default(false) %}
+    <!-- tags input -->
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js" defer></script>
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" as="style"
+          onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css"></noscript>
+{% endif %}
+<!--jquery-->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous" defer></script>
+<!--editor-->
+{% if tinymce_api_key and layout_assets.editor | default(false) %}
+    <script src="https://cdn.tiny.cloud/1/{{ tinymce_api_key }}/tinymce/8/tinymce.min.js" referrerpolicy="origin"
+            crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tinymce/tinymce-jquery/dist/tinymce-jquery.min.js" defer></script>
+{% endif %}
+<!-- Code samples highlight -->
+{% if layout_assets.prism | default(false) %}
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.x/components/prism-core.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.x/plugins/autoloader/prism-autoloader.min.js" defer></script>
+{% endif %}
+<!--custom-->
+<script>
+  window.CONFIG = {
+    current_user: {{ ({"id": cur_user.id} | tojson) if cur_user else "null" }},
+    update_prompt_status_url: {{ url("update-prompt-status", prompt_id="{prompt_id}", absolute=True) | tojson }},
+    update_prompt_impression_url: {{ url("update-prompt-impression", prompt_id="{prompt_id}", absolute=True) | tojson }},
+    update_user_status_url: {{ url("update-user-status", user_id="{user_id}", absolute=True) | tojson }},
+    update_user_impression_url: {{ url("update-user-impression", user_id="{user_id}", absolute=True) | tojson }},
+    create_tag_subscription_url: {{ url("create-tag-subscription", absolute=True) | tojson }},
+    delete_tag_subscription_url: {{ url("delete-tag-subscription", tag_subscription_id="{tag_subscription_id}", absolute=True) | tojson }},
+    init_tinymce: {% if tinymce_api_key and layout_assets.editor | default(false) %}true{% else %}false{% endif %},
+    css_filenames: {{ css_filenames | tojson | safe }},
+    static_relative_url: {{ static_url("{filename}") | tojson }},
+    upload_public_file_url: {{ url("upload-public-file", absolute=True) | tojson }}
+  }
+</script>
+<!-- Code samples highlight -->
+{% if layout_assets.prism | default(false) %}
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/prismjs@1.x/themes/prism.css" as="style"
+          onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://cdn.jsdelivr.net/npm/prismjs@1.x/themes/prism.css" rel="stylesheet"></noscript>
+{% endif %}
+{% if layout_assets.masonry | default(false) %}
+    <script src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js"
+            integrity="sha384-GNFwBvfVxBkLMJpYMOABq3c+d3KnQxudP/mGPkzpZSTYykLBNsZEnG2D9G/X/+7D"
+            crossorigin="anonymous" defer></script>
+{% endif %}
+<script src="{{ static_url('scripts.js', _=js_cache_counter) }}" defer></script>
+</body>
+</html>

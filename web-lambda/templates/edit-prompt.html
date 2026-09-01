@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+
+{% set title = ("Edit " ~ prompt.title) | trim %}
+{% set meta_robots = "noindex, nofollow" %}
+{% set meta_title = title ~ " | " ~ site_name %}
+{% set meta_canonical_url = url("edit-prompt", prompt_id=prompt.id, absolute=True) %}
+
+{% block breadcrumbs %}
+    {% with breadcrumbs = {"Home": url("index"), "Prompts": prompts_url(), (prompt.title): prompt_url(prompt), "Edit": None} %}
+        {% include "fragments/breadcrumbs.html" %}
+    {% endwith %}
+{% endblock %}
+
+{% block content %}
+    {% include "fragments/prompt-form.html" %}
+{% endblock %}

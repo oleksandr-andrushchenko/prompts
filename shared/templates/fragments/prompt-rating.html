@@ -1,0 +1,21 @@
+{% set prompt_rating = prompt_sentiment_rating(prompt.likes_count, prompt.dislikes_count) %}
+
+{% if prompt_rating %}
+    <span class="prompt-rating {{ rating_size | default("") }}" title="{{ prompt_rating.score }} out of 5 from {{ prompt_rating.total_count }} votes"
+          aria-label="{{ prompt_rating.score }} out of 5 from {{ prompt_rating.total_count }} votes">
+        {% for star in range(1, 6) %}
+            {% if star <= prompt_rating.filled_stars %}
+                <i class="bi bi-star-fill text-warning"></i>
+            {% elif star == prompt_rating.filled_stars + 1 and prompt_rating.has_half_star %}
+                <i class="bi bi-star-half text-warning"></i>
+            {% else %}
+                <i class="bi bi-star text-secondary"></i>
+            {% endif %}
+        {% endfor %}
+        {% if rating_extended | default(False) %}
+            <span class="text-secondary fs-6">{{ prompt_rating.score }} out of 5 from {{ prompt_rating.total_count }} votes</span>
+        {% else %}
+            <small class="text-secondary">{{ prompt_rating.score }}/5 ({{ prompt_rating.total_count }})</small>
+        {% endif %}
+    </span>
+{% endif %}

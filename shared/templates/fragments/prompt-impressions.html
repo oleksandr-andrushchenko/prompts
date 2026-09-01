@@ -1,0 +1,29 @@
+<div class="prompt-impressions d-flex gap-1 align-items-center">
+    {% if cur_user and check_auth(cur_user, Permission.UPDATE_PROMPT_IMPRESSION, prompt) %}
+        <!-- Like / Unlike Button -->
+        {% set is_liked = prompt_impression and prompt_impression.action == PromptImpressionAction.LIKE %}
+        <button type="button"
+                class="btn btn-prompt-like {% if is_liked %}btn-success active{% else %}btn-light{% endif %}{% if cur_user.status == UserStatus.BANNED %} disabled{% endif %}"
+                data-prompt-id="{{ prompt.id }}"
+                data-action="{{ PromptImpressionAction.LIKE.value }}"
+                title="{% if is_liked %}Unlike this prompt{% else %}Like this prompt{% endif %}">
+            <i class="bi {% if is_liked %}bi-hand-thumbs-up-fill{% else %}bi-hand-thumbs-up{% endif %}"></i>
+            {{ prompt.likes_count }} {% if is_liked %}- Liked{% endif %}
+        </button>
+
+        <!-- Dislike / Undislike Button -->
+        {% set is_disliked = prompt_impression and prompt_impression.action == PromptImpressionAction.DISLIKE %}
+        <button type="button"
+                class="btn btn-prompt-dislike {% if is_disliked %}btn-danger active{% else %}btn-light{% endif %}{% if cur_user.status == UserStatus.BANNED %} disabled{% endif %}"
+                data-prompt-id="{{ prompt.id }}"
+                data-action="{{ PromptImpressionAction.DISLIKE.value }}"
+                title="{% if is_disliked %}Undislike this prompt{% else %}Dislike this prompt{% endif %}">
+            <i class="bi {% if is_disliked %}bi-hand-thumbs-down-fill{% else %}bi-hand-thumbs-down{% endif %}"></i>
+            {{ prompt.dislikes_count }} {% if is_disliked %}- Disliked{% endif %}
+        </button>
+    {% else %}
+        <!-- Counts -->
+        <div><b>{{ prompt.likes_count }}</b> <small class="text-secondary">Likes</small></div>
+        <div><b>{{ prompt.dislikes_count }}</b> <small class="text-secondary">Dislikes</small></div>
+    {% endif %}
+</div>

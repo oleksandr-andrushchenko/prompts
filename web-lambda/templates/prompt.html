@@ -1,0 +1,283 @@
+{% extends "layout.html" %}
+{% set prompt_canonical_url = prompt_url(prompt, absolute=True) %}
+{% set prompt_alternate_url = url("prompt", prompt_id=prompt.id, absolute=True) %}
+{% set author_canonical_url = user_url(author, absolute=True) %}
+{% set author_alternate_url = url("user", user_id=author.id, absolute=True) %}
+{% set meta_desc = [prompt.title, meta_desc, meta_desc] | select | join('. ') | truncate(155, True, '...') %}
+{% set meta_title = prompt.title ~ " | by " ~ author.name ~ " ~ " ~ site_name %}
+{% set meta_robots = "index, follow" %}
+{% set og_type = "prompt" %}
+{% set meta_canonical_url = prompt_canonical_url %}
+{% set og_url = meta_canonical_url %}
+{% set og_img_filename = prompt.image_filenames[0] %}
+{% set prompt_og_author = author_canonical_url %}
+{% set prompt_og_published_time = prompt.published_at | iso_utc if prompt.published_at else None %}
+{% set prompt_og_modified_time = prompt.updated_at | iso_utc if prompt.updated_at and prompt.published_at else None %}
+{% set prompt_og_tags = prompt.tags %}
+{% block meta_schema %}
+    {% set prompt_body = prompt.content %}
+    {% set prompt_image_url = prompt.image_filenames[0] if prompt.image_filenames[0] and (prompt.image_filenames[0].startswith('http://') or prompt.image_filenames[0].startswith('https://')) else static_url(prompt.image_filenames[0], absolute=True) if prompt.image_filenames[0] else None %}
+    {% set comment_schemas = namespace(values=[]) %}
+    {% for prompt_comment in comments %}
+        {% set comment_user = prompt_comment.get_user() %}
+        {% set comment_anchor = "comment-" ~ (prompt_comment.id | replace("#", "-")) %}
+        {% set comment_schemas.values = comment_schemas.values + [{
+            "@type": "Comment",
+            "@id": meta_canonical_url ~ "#" ~ comment_anchor,
+            "url": meta_canonical_url ~ "#" ~ comment_anchor,
+            "author": {
+                "@type": "Person",
+                "@id": user_url(comment_user, absolute=True),
+                "name": comment_user.name,
+                "url": user_url(comment_user, absolute=True)
+            },
+            "datePublished": prompt_comment.created_at | iso_utc,
+            "text": prompt_comment.text
+        }] %}
+    {% endfor %}
+    {% set author_schema = {
+        "@context": "https://schema.org",
+        "@id": author_canonical_url,
+        "@type": "Person",
+        "identifier": author.username or author.id,
+        "name": author.name,
+        "url": author_canonical_url,
+        "sameAs": [author.website] if author.website else []
+    } %}
+    {% set prompt_schema = {
+        "@context": "https://schema.org",
+        "@id": meta_canonical_url,
+        "@type": "Prompt",
+        "url": meta_canonical_url,
+        "dateCreated": prompt.created_at | iso_utc,
+        "datePublished": (prompt.published_at | iso_utc) if prompt.published_at else None,
+        "headline": prompt.title,
+        "name": prompt.title,
+        "description": meta_desc,
+        "promptBody": prompt_body,
+        "wordCount": prompt_body.split() | length,
+        "inLanguage": "en",
+        "identifier": prompt.id,
+        "commentCount": prompt.comments_count | int,
+        "author": author_schema,
+        "creator": author_schema,
+        "publisher": {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "@id": author_schema["@id"],
+            "name": author_schema["name"],
+            "url": author_schema["url"],
+            "logo": {
+                "@type": "ImageObject",
+                "url": static_url(site_img_filename, absolute=True)
+            } if site_img_filename else None,
+            "sameAs": ([author_alternate_url] if author_canonical_url != author_alternate_url else [])
+                       + ([author.website] if author.website else [])
+        },
+        "mainEntityOfPage": meta_canonical_url,
+        "isAccessibleForFree": not prompt.is_premium,
+        "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": url("index", absolute=True)},
+                {"@type": "ListItem", "position": 2, "name": "Prompts", "item": prompts_url(absolute=True)},
+                {"@type": "ListItem", "position": 3, "name": prompt.title, "item": meta_canonical_url}
+            ]
+        }
+    } %}
+    {% if prompt_image_url %}
+        {% set prompt_schema = prompt_schema.update({
+            "image": [prompt_image_url],
+            "thumbnailUrl": prompt_image_url
+        }) or prompt_schema %}
+    {% endif %}
+    {% if comment_schemas.values %}
+        {% set prompt_schema = prompt_schema.update({"comment": comment_schemas.values}) or prompt_schema %}
+    {% endif %}
+    {% if prompt.updated_at and prompt.published_at and prompt.updated_at - prompt.published_at > 86_400_000 %}
+        {% set prompt_schema = prompt_schema.update({"dateModified": prompt.updated_at | iso_utc}) or prompt_schema %}
+    {% endif %}
+    {{- prompt_schema | tojson | safe -}}
+{% endblock %}
+
+{% block breadcrumbs %}
+    {% with breadcrumbs = {"Home": url("index"), "Prompts": prompts_url(), (prompt.title): None} %}
+        {% include "fragments/breadcrumbs.html" %}
+    {% endwith %}
+{% endblock %}
+
+{% block content %}
+    <div class="row g-5">
+        <div class="col col-12 col-lg-6 col-xl-8 d-flex flex-column">
+            <article>
+                <header>
+                    <h1 class="mb-0">{{ prompt.title }}</h1>
+
+                    {% with rating_size="fs-3", rating_extended=True %}
+                        {% include "fragments/prompt-rating.html" %}
+                    {% endwith %}
+
+                    <p class="small text-secondary">
+                        By <a href="{{ user_url(author) }}" class="link-secondary">{{ author.name }}</a>
+                        {% if prompt.published_at %}
+                            &mdash;
+                            Published on
+                            <time>{{ (prompt.published_at / 1000) | unix_to_full_date }}</time>
+                            {% if prompt.updated_at and prompt.updated_at - prompt.published_at > 86_400_000 %}
+                                &mdash; Modified on
+                                <time>{{ (prompt.updated_at / 1000) | unix_to_full_date }}</time>
+                            {% endif %}
+                        {% endif %}
+                    </p>
+                </header>
+
+                {% if prompt.image_filenames %}
+                    <section class="prompt-results mb-4">
+                        <h2 class="h4">Results</h2>
+                        <div class="d-flex flex-wrap gap-3">
+                            {% for filename in prompt.image_filenames %}
+                                {% with filename=filename, alt=prompt.title, img_class="img-fluid rounded", figure=True %}
+                                    {% include "fragments/image.html" %}
+                                {% endwith %}
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endif %}
+
+                <section class="prompt-content mb-4">
+                    <h2 class="h4">Prompt</h2>
+                    <div class="prompt-content-text">{{ prompt.content }}</div>
+                </section>
+            </article>
+
+            <section class="prompt-comments">
+                <h3>Comments ({{ prompt.comments_count }})</h3>
+
+                <div class="d-flex flex-column gap-4">
+                    {% include "fragments/prompt-comment-form.html" %}
+
+                    {% if comments %}
+                        <div id="prompt-comments" class="d-flex flex-column gap-3">
+                            {% with prompt_comments=comments %}
+                                {% include "fragments/prompt-comments.html" %}
+                            {% endwith %}
+                        </div>
+
+                        {% with limit=comments_query.limit,
+                            offset=comments[-1].offset,
+                            url=url("prompt-comments-fragment", prompt_id=prompt.id, absolute=True, **comments_query.get_dict()),
+                            container="#prompt-comments" %}
+                            {% include "fragments/load-more-button.html" %}
+                        {% endwith %}
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+
+        <div class="col col-12 col-lg-6 col-xl-4 d-flex flex-column gap-4 border-start">
+            <section class="d-flex flex-column gap-3">
+                <h2 class="h5 mb-0 text-decoration-underline">Author</h2>
+                {% with user=author,
+                    h_tag_size=3,
+                    image_column_size={"def":3,"md":2},
+                    border=False %}
+                    {% include "fragments/user.html" %}
+                {% endwith %}
+            </section>
+
+            {% with user=author %}
+                {% include "fragments/bmc-donate.html" %}
+            {% endwith %}
+
+            <section class="d-flex flex-column gap-3">
+                <h2 class="h5 mb-0 text-decoration-underline">Prompt info</h2>
+                {% if prompt.model %}
+                    <div><strong>Model:</strong> {{ prompt.model.title }} ({{ prompt.model.version }})</div>
+                {% endif %}
+                <div class="d-flex flex-column gap-1">
+                    {% if prompt.tags %}
+                        <div>
+                            <small class="text-secondary bi bi-tags"> Tags:</small>
+                            {% for tag in prompt.tags %}
+                                <a href="{{ prompts_url(tags=[tag]) }}" class="btn btn-light btn-sm">
+                                    {{ tag }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% if prompt.status == PromptStatus.REJECTED %}
+                        <div>
+                            <small class="text-secondary">Status:</small>
+                            <span class="badge text-bg-danger fs-5" title="{{ prompt.comment }}">Rejected</span>
+                        </div>
+                    {% elif prompt.status == PromptStatus.UNPUBLISHED %}
+                        <div>
+                            <small class="text-secondary">Status:</small>
+                            <span class="badge text-bg-warning fs-6">Unpublished (Pending)</span>
+                        </div>
+                    {% endif %}
+
+                    <div>
+                        <small class="text-secondary bi bi-calendar2"> Created:</small>
+                        {{ (prompt.created_at / 1000) | unix_to_full_date }}
+
+                        {% if prompt.updated_at %}
+                            <br>
+                            <small class="text-secondary">Updated:</small>
+                            {{ (prompt.updated_at / 1000) | unix_to_full_date }}
+                        {% endif %}
+
+                        {% if prompt.published_at %}
+                            <br>
+                            <small class="text-secondary">Published:</small>
+                            {{ (prompt.published_at / 1000) | unix_to_full_date }}
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="d-flex flex-column gap-3">
+                <h2 class="h5 mb-0 text-decoration-underline">Prompt actions</h2>
+                <div class="d-flex flex-column gap-1">
+                    {% include "fragments/prompt-status.html" %}
+                    {% include "fragments/prompt-impressions.html" %}
+
+                    {% if cur_user and check_auth(cur_user, Permission.UPDATE_PROMPT, prompt) %}
+                        <div>
+                            <a href="{{ url("edit-prompt", prompt_id=prompt.id) }}"
+                               class="btn btn-light bi bi-pencil">
+                                Edit prompt
+                            </a>
+                        </div>
+                    {% endif %}
+
+                    {% with url_to_copy=prompt_alternate_url, copy_url_label="Copy persistent prompt link" %}
+                        {% include "fragments/copy-url.html" %}
+                    {% endwith %}
+
+                    {% with share_label="Share this prompt" %}
+                        {% include "fragments/share.html" %}
+                    {% endwith %}
+                </div>
+            </section>
+
+            {% if related_prompts %}
+                <section class="d-flex flex-column gap-3">
+                    <h2 class="h5 mb-0 text-decoration-underline">Related prompts</h2>
+                    <div id="related-prompts" class="d-flex flex-column gap-3">
+                        {% with prompts=related_prompts,
+                            preview=False,
+                            border=False,
+                            vert_gap=0,
+                            h_tag_size=3,
+                            h_display_size=6,
+                            image_order_size={"def":12} %}
+                            {% include "fragments/prompts.html" %}
+                        {% endwith %}
+                    </div>
+                </section>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

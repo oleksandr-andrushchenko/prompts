@@ -1,0 +1,49 @@
+{% if prompt.status != PromptStatus.PUBLISHED and cur_user and check_auth(cur_user, Permission.UPDATE_PROMPT_STATUS) %}
+    <div class="input-group">
+        <!-- Publish Prompt -->
+        {% set is_published = prompt.status == PromptStatus.PUBLISHED %}
+        <button type="button"
+                class="btn {% if is_published %}btn-success active{% else %}btn-light btn-prompt-publish{% endif %}"
+                data-prompt-id="{{ prompt.id }}"
+                data-status="{{ PromptStatus.PUBLISHED.value }}"
+                {% if not is_published %}
+                title="Publish this prompt"
+                {% endif %}>
+            {% if is_published %}<i class="bi bi-check2-all"></i>{% endif %} {% if is_published %}Published{% else %}
+            Publish{% endif %}
+        </button>
+
+        <!-- Unpublish Prompt -->
+        {% set is_unpublished = prompt.status == PromptStatus.UNPUBLISHED %}
+        <button type="button"
+                class="btn {% if is_unpublished %}btn-warning active{% else %}btn-light btn-prompt-unpublish{% endif %}"
+                data-prompt-id="{{ prompt.id }}"
+                data-status="{{ PromptStatus.UNPUBLISHED.value }}"
+                {% if not is_unpublished %}
+                title="Unpublish this prompt"
+                {% endif %}>
+            {% if is_unpublished %}<i class="bi bi-clock"></i>{% endif %} {% if is_unpublished %}Unpublished{% else %}
+            Unpublish{% endif %}
+        </button>
+
+        <!-- Reject Prompt -->
+        {% set is_rejected = prompt.status == PromptStatus.REJECTED %}
+        <input type="text"
+               class="form-control"
+               name="comment"
+               id="comment"
+               placeholder="Rejection reason..."
+               value="{{ prompt.comment if prompt and prompt.comment else '' }}"
+               {% if is_rejected %}disabled{% endif %}>
+        <button type="button"
+                class="btn {% if is_rejected %}btn-danger active{% else %}btn-light btn-prompt-reject{% endif %}"
+                data-prompt-id="{{ prompt.id }}"
+                data-status="{{ PromptStatus.REJECTED.value }}"
+                {% if not is_rejected %}
+                title="Reject this prompt"
+                {% endif %}>
+            {% if is_rejected %}<i class="bi bi-x-lg"></i>{% endif %} {% if is_rejected %}Rejected{% else %}
+            Reject{% endif %}
+        </button>
+    </div>
+{% endif %}

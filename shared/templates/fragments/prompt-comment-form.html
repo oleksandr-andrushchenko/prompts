@@ -1,0 +1,34 @@
+<form id="prompt-comment-form" novalidate>
+    <div class="form-group">
+        <label class="w-100">
+            <textarea class="form-control" id="text" name="text" placeholder="Write a comment" required
+                      rows="3">{{ prompt_comment.text if prompt_comment else "" }}</textarea>
+        </label>
+    </div>
+
+    <button type="submit" class="btn btn-light">
+        <i class="bi {% if prompt_comment %}bi-arrow-clockwise{% else %}bi-plus-lg{% endif %}"></i>
+        {% if prompt_comment %}Update{% else %}Add{% endif %} comment
+    </button>
+</form>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    {% set form_url = url('update-prompt-comment', prompt_id=prompt.id, prompt_comment_id=prompt_comment.id, absolute=True) if prompt_comment
+    else url('create-prompt-comment', prompt_id=prompt.id, absolute=True) %}
+    handleFormSubmit("#prompt-comment-form", {{ form_url | tojson }}, {
+      method: "{{ 'PATCH' if prompt_comment else 'POST' }}",
+      rules: {
+        text: [
+          {rule: "required"},
+          {rule: "minLength", value: 1},
+          {rule: "maxLength", value: 5_000}
+        ],
+      },
+      onSuccess: (res) => {
+        if (res) window.location.href = res
+      },
+      successMessage: "Prompt comment added!"
+    })
+  })
+</script>

@@ -1,0 +1,24 @@
+{% set image = prompt.image_filenames[0] if prompt.image_filenames else None %}
+{% set vert_gap = vert_gap | default(1) %}
+{% set h_tag_size = h_tag_size | default(3) %}
+{% set h_display_size = h_display_size | default(4) %}
+{% set image_column_size = image_column_size | default({"def": 12, "sm": 3}) if image else 0 %}
+{% set prompt_user = prompt.get_user() %}
+{% set prompt_img_sizes = prompt_img_sizes | default({"768px": "25vw", "default": "100vw"}) %}
+
+<div class="prompt col"{% if prompt.offset %} data-offset="{{ prompt.offset }}"{% endif %}>
+    <div class="card">
+        {% if image %}
+            <div class="row g-0">
+                <div class="{{ image_column_size | col_classes }} d-flex align-items-center">
+                    {% include "fragments/prompt-link-image.html" %}
+                </div>
+                <div class="{{ image_column_size | col_classes(inverse=True) }}">
+                    {% include "fragments/prompt-body.html" %}
+                </div>
+            </div>
+        {% else %}
+            {% include "fragments/prompt-body.html" %}
+        {% endif %}
+    </div>
+</div>

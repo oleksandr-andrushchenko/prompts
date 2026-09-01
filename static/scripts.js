@@ -1,0 +1,970 @@
+// Form validation & submission
+
+// Send the auth cookie with cross-origin API requests (localhost:5000 -> localhost:5002).
+$.ajaxSetup({
+  xhrFields: {withCredentials: true}
+})
+
+const ajaxResponse = options => new Promise(resolve => {
+  let request
+  const finish = (ok, data, xhr) => resolve({
+    ok,
+    status: xhr.status,
+    json: async () => data ?? {},
+    text: async () => typeof data === "string" ? data : JSON.stringify(data ?? {})
+  })
+  request = $.ajax(options).done((data, _textStatus, xhr) => finish(true, data, xhr))
+    .fail(xhr => finish(false, xhr.responseJSON ?? xhr.responseText, xhr))
+  if (options.signal) options.signal.addEventListener("abort", () => request.abort(), {once: true})
+})
+const toKebabCase = str => String(str || "").trim().toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-")
+
+function getMasonryInstance(container) {
+  if (typeof Masonry === "undefined" || !container.matches("[data-masonry]")) return null
+
+  let masonry = Masonry.data(container)
+  if (masonry) return masonry
+
+  try {
+    const options = JSON.parse(container.dataset.masonry || "{}")
+    masonry = new Masonry(container, options)
+  } catch (err) {
+    console.error("Unable to initialize Masonry:", err)
+  }
+  return masonry
+}
+
+function initializeMasonryContainers() {
+  if (typeof Masonry === "undefined") return
+  document.querySelectorAll("[data-masonry]").forEach(getMasonryInstance)
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeMasonryContainers, {once: true})
+} else {
+  initializeMasonryContainers()
+}
+
+
+$.fn.setButtonLoading = function (loadingText = "Loading...") {
+  return this.each(function () {
+    const $button = $(this)
+
+    if ($button.data("loading-original-content") === undefined) {
+      $button.data("loading-original-content", $button.contents().detach())
+    }
+
+    const $spinner = $("<span>", {
+      class: "spinner-border spinner-border-sm me-2",
+      role: "status",
+      "aria-hidden": "true"
+    })
+
+    $button
+      .prop("disabled", true)
+      .addClass("disabled")
+      .attr("aria-busy", "true")
+      .empty()
+      .append($spinner, document.createTextNode(String(loadingText)))
+  })
+}
+
+$.fn.clearButtonLoading = function () {
+  return this.each(function () {
+    const $button = $(this)
+    const originalContent = $button.data("loading-original-content")
+
+    if (originalContent !== undefined) {
+      $button.empty().append(originalContent).removeData("loading-original-content")
+    }
+
+    $button
+      .prop("disabled", false)
+      .removeClass("disabled")
+      .removeAttr("aria-busy")
+  })
+}
+
+function handleFormSubmit(formSelector, submitUrl, options = {}) {
+  const {
+    method = "POST",
+    successMessage = "Success!",
+    errorMessage = "Something went wrong. Please try again.",
+    validationFailedMessage = "Please fix the highlighted fields.",
+    rules = {},
+    onSuccess = () => {
+    },
+    beforeSubmit = async () => {
+    },
+    loadingText = "Submitting...",
+    authRequired = true
+  } = options
+
+  const form = document.querySelector(formSelector)
+  if (!form) return
+
+  // Insert status div before submit button
+  const submitBtn = form.querySelector("[type='submit']")
+  const statusDiv = document.createElement("div")
+  statusDiv.className = "form-status alert d-none"
+  statusDiv.setAttribute("role", "alert")
+  submitBtn.insertAdjacentElement("beforebegin", statusDiv)
+
+  let originalBtnContent = submitBtn.innerHTML
+
+  let validator = null
+  let hasTags = false
+
+  if (typeof window.JustValidate !== "undefined") {
+    validator = new window.JustValidate(formSelector, {
+      errorFieldCssClass: "is-invalid",
+      errorLabelCssClass: "invalid-feedback",
+      successFieldCssClass: "is-valid",
+      successLabelCssClass: "valid-feedback",
+      focusInvalidField: true,
+      lockForm: true
+    })
+
+    Object.entries(rules).forEach(([field, fieldRules]) => {
+      for (const fieldRuleId in fieldRules) {
+        if (fieldRules[fieldRuleId].rule === "tags") {
+          const {minCnt, maxCnt, minLen, maxLen} = fieldRules[fieldRuleId]
+          fieldRules[fieldRuleId] = {
+            validator: (value) => {
+              if (!value) return true
+              const values = JSON.parse(value)
+              if (!Array.isArray(values)) return true
+              const items = values.map(item => toKebabCase(item.value)).filter(Boolean)
+              return items.length >= minCnt && items.length <= maxCnt && items.every(t => t.length >= minLen && t.length <= maxLen)
+            }, errorMessage: `Tags must be ${minCnt}–${maxCnt} items, ${minLen}–${maxLen} chars each`
+          }
+          hasTags = true
+        }
+      }
+
+      validator.addField(`[name="${field}"]`, fieldRules)
+    })
+
+    validator.onSuccess(() => submitForm())
+  } else {
+    // Fallback: submit without frontend validation
+    $(form).on("submit", (e) => {
+      e.preventDefault()
+      submitForm()
+    })
+  }
+
+  async function submitForm() {
+    // Show loading state
+    submitBtn.disabled = true
+    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${loadingText}`
+
+    statusDiv.className = "form-status alert d-none"
+    statusDiv.textContent = ""
+
+    let data = {}
+    form.querySelectorAll("input[name]:not([data-form-ignore]), select[name]:not([data-form-ignore]), textarea[name]:not([data-form-ignore])").forEach(input => {
+      if (input.disabled) return
+
+      // handle radio buttons separately
+      if (input.type === "radio") {
+        if (input.checked) data[input.name] = input.value
+      } else if (input.type === "checkbox") {
+        data[input.name] = input.checked
+      } else {
+        const value = input.value.trim()
+        data[input.name] = value === "" ? null : value
+      }
+      input.classList.remove("is-invalid") // reset invalid states
+    })
+
+    if (hasTags) {
+      const values = JSON.parse(form.tags.value)
+      data.tags = values.map(item => toKebabCase(item.value)).filter(Boolean)
+    }
+
+    let msgClass = "danger"
+    let msgIcon = "exclamation-triangle-fill"
+    let msgText = errorMessage
+
+    try {
+      if (!validator) {
+        // Simple frontend validation fallback
+        let hasError = false
+        form.querySelectorAll("input[required], select[required], textarea[required]").forEach(input => {
+          if (input.disabled) return
+
+          if (!input.value.trim()) {
+            input.classList.add("is-invalid")
+            hasError = true
+
+            // Optional: create invalid-feedback div if not present
+            let feedback = input.nextElementSibling
+            if (!feedback || !feedback.classList.contains("invalid-feedback")) {
+              feedback = document.createElement("div")
+              feedback.className = "invalid-feedback"
+              input.insertAdjacentElement("afterend", feedback)
+            }
+            feedback.textContent = input.getAttribute("data-error") || "This field is required."
+          }
+        })
+
+        if (hasError) {
+          msgClass = "warning"
+          msgText = validationFailedMessage
+          return
+        }
+      }
+
+      if (authRequired && !window.CONFIG.current_user) {
+        msgText = "You need to be logged in to perform this action."
+        msgClass = "warning"
+        return
+      }
+
+      // Upload all file inputs separately
+      await beforeSubmit(data)
+
+      const fileInputs = form.querySelectorAll("input[type=\"file\"]:not([data-form-ignore])")
+      for (const input of fileInputs) {
+        if (input.files.length === 0) continue
+
+        const filename = await uploadPublicFile(input.files[0])
+
+        delete data[input.name]
+        data[input.name + "name"] = filename
+      }
+
+      // Submit the JSON payload
+      const response = await ajaxResponse({
+        url: submitUrl,
+        method,
+        contentType: "application/json",
+        data: JSON.stringify(data),
+        dataType: "json"
+      })
+
+      if (response.ok) {
+        msgClass = "success"
+        msgIcon = "check-circle-fill"
+        form.reset()
+        if (validator) validator.refresh()
+
+        let responseBody = {}
+        if (response.status !== 204) {
+          try {
+            responseBody = await response.json()
+          } catch (_) {
+          }
+        }
+        msgText = onSuccess(responseBody) || successMessage
+        return
+      }
+
+      if ([409, 422].includes(response.status)) {
+        const json = await response.json()
+        msgClass = "warning"
+        msgText = validationFailedMessage
+
+        if (validator && json.details) {
+          const errors = {}
+          Object.entries(json.details).forEach(([field, msg]) => {
+            const sel = `[name="${field}"]`
+            if (!validator.fields[sel]) {
+              validator.addField(sel, [
+                {
+                  validator: () => true,
+                  errorMessage: ''
+                }
+              ])
+            }
+            errors[sel] = msg.replace(/^Value error, /, '')
+          })
+          validator.showErrors(errors)
+        } else if (!validator && json.details) {
+          // fallback: highlight invalid fields without validator
+          Object.entries(json.details).forEach(([field, msg]) => {
+            const input = form.querySelector(`[name="${field}"]`)
+            if (input) {
+              input.classList.add("is-invalid")
+              let feedback = input.nextElementSibling
+              if (!feedback || !feedback.classList.contains("invalid-feedback")) {
+                feedback = document.createElement("div")
+                feedback.className = "invalid-feedback"
+                input.insertAdjacentElement("afterend", feedback)
+              }
+              feedback.textContent = msg
+            }
+          })
+        }
+        return
+      }
+
+      if ([401].includes(response.status)) {
+        msgText = "You need to be logged in to perform this action."
+        msgClass = "warning"
+        return
+      }
+    } catch (err) {
+      console.error("Form submission failed:", err)
+      msgText = err.message || errorMessage
+      msgClass = "warning"
+    } finally {
+      submitBtn.disabled = false
+      submitBtn.innerHTML = originalBtnContent
+      statusDiv.className = `form-status alert alert-${msgClass}`
+      statusDiv.innerHTML = `<i class="bi bi-${msgIcon} me-2"></i> ${msgText}`
+    }
+  }
+}
+
+// Load more
+(() => {
+  $(document).on("click", ".btn-load-more", async function () {
+    const btn = this
+    if (btn.disabled) return
+
+    const container = document.querySelector(btn.dataset.container)
+    if (!container) return console.error("Container not found:", btn.dataset.container)
+
+    const limit = btn.dataset.limit
+    const url = btn.dataset.url
+    const offset = btn.dataset.offset
+
+    const $btn = $(btn)
+    $btn.setButtonLoading()
+
+    try {
+      const u = new URL(url, window.location.origin)
+      u.searchParams.set("offset", offset)
+      u.searchParams.set("limit", limit)
+      const resp = await ajaxResponse({url: u.toString(), method: "GET", dataType: "text"})
+      if (!resp.ok) {
+        console.log(`Request failed with status ${resp.status}`)
+        btn.remove()
+        return
+      }
+
+      const content = await resp.text()
+      if (content === "") {
+        btn.remove()
+        return
+      }
+
+      const fragment = document.createRange().createContextualFragment(content)
+      const newElements = Array.from(fragment.children)
+      container.append(fragment)
+
+      const masonry = getMasonryInstance(container)
+      if (masonry && newElements.length) {
+        masonry.appended(newElements)
+        const images = newElements.flatMap(element => Array.from(element.querySelectorAll("img")))
+        Promise.all(images.map(image => image.complete ? Promise.resolve() : new Promise(resolve => {
+          image.addEventListener("load", resolve, {once: true})
+          image.addEventListener("error", resolve, {once: true})
+        }))).then(() => masonry.layout())
+      }
+
+      const lastElement = container.lastElementChild
+      const newOffset = lastElement.dataset.offset
+
+      if (!newOffset || newOffset === offset) {
+        btn.remove()
+        return
+      }
+
+      btn.dataset.offset = newOffset
+    } catch (err) {
+      console.error(err)
+    } finally {
+      $btn.clearButtonLoading()
+    }
+  })
+
+  // --- Auto-load support only for [data-auto-load] buttons ---
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.click() // Trigger the same handler
+      }
+    }
+  }, {
+    rootMargin: "200px" // start loading earlier than fully visible
+  })
+
+// Attach observer only to buttons with data-auto-load
+  $(".btn-load-more[data-auto-click]").each(function () {
+    observer.observe(this)
+  })
+})();
+
+
+// Tags input
+(() => {
+  const input = document.getElementById("tags-input")
+  if (!input || typeof Tagify === "undefined") return
+  const url = input.dataset.url
+  const injectHidden = input.dataset.hasOwnProperty("injectHidden")
+  const autoSubmit = input.dataset.hasOwnProperty("autoSubmit")
+  const form = input.closest("form")
+  const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  })[char])
+
+  const tagify = new Tagify(input, {
+    whitelist: [], // maxTags: 3,
+    tagTextProp: "name",
+    enforceWhitelist: false, // validate: tag => /^[0-9A-Za-z-.#]{2,20}$/.test(tag.value) || "Invalid tag",
+    transformTag(tagData) {
+      // Keep an existing tag's slug/name pair intact. Only normalize free-form
+      // values; replacing tags from the `add` event makes Tagify briefly see the
+      // selected value twice and reject/remove it as a duplicate.
+      if (!tagData.name || tagData.name === tagData.value) {
+        tagData.value = toKebabCase(tagData.value)
+        tagData.name = tagData.value
+      }
+    },
+    templates: {
+      dropdownItem(tagData) {
+        const className = tagData.class ? ` ${tagData.class}` : ""
+        return `<div ${this.getAttributes(tagData)} class="tagify__dropdown__item${className}" tabindex="0" role="option">${escapeHtml(tagData.name || tagData.value)}</div>`
+      }
+    },
+    dropdown: {
+      // enabled: 1,
+      // maxItems: 10,
+      closeOnSelect: true
+    }
+  })
+
+  let controller // for aborting the previous fetch
+  let currentSuggestions = []
+
+  const toTagItem = d => {
+    if (typeof d === "string") return {value: d, name: d}
+    const value = d.slug || d.value || d.name
+    const name = d.name || d.slug || d.value
+    return value ? {value, name} : null
+  }
+
+  if (injectHidden) {
+    input.removeAttribute("name")
+    // container for hidden inputs
+    let hiddenContainer = document.createElement("div")
+    hiddenContainer.style.display = "none"
+    form.appendChild(hiddenContainer)
+
+    // rebuild hidden inputs on change
+    function syncHiddenInputs() {
+      hiddenContainer.innerHTML = ""
+      tagify.value.forEach(tag => {
+        const hidden = document.createElement("input")
+        hidden.type = "hidden"
+        hidden.name = "tags"  // use "tags" so backend maps correctly
+        hidden.value = tag.value
+        hiddenContainer.appendChild(hidden)
+      })
+    }
+
+    tagify.on("change", syncHiddenInputs)
+
+    // Immediately sync hidden inputs for any preloaded tags
+    if (tagify.value.length) {
+      syncHiddenInputs()
+    }
+  }
+
+  // event fired when user types
+  tagify.on("input", onInput)
+
+  function onInput(e) {
+    const value = e.detail.value
+    const prefix = toKebabCase(value)
+    tagify.whitelist = []
+    currentSuggestions = []
+    tagify.dropdown.hide()
+
+    controller && controller.abort()
+
+    if (!prefix) {
+      tagify.loading(false)
+      return
+    }
+
+    controller = new AbortController()
+
+    tagify.loading(true)
+
+    const u = new URL(url, window.location.origin)
+    u.searchParams.set("prefix", prefix)
+    ajaxResponse({
+      url: u.toString(),
+      method: "GET",
+      dataType: "json",
+      signal: controller.signal
+    })
+      .then(async res => {
+        if (!res.ok) {
+          if ([409, 422].includes(res.status)) {
+            const json = await res.json().catch(() => null)
+            if (json?.details) {
+              Object.entries(json.details).forEach(([field, msg]) => {
+                input.classList.add("is-invalid")
+                let feedback = input.nextElementSibling
+                if (!feedback || !feedback.classList.contains("invalid-feedback")) {
+                  feedback = document.createElement("div")
+                  feedback.className = "invalid-feedback"
+                  input.insertAdjacentElement("afterend", feedback)
+                }
+                feedback.textContent = msg
+              })
+            }
+          } else {
+            console.error(`Tags fetch failed with status ${res.status}`)
+          }
+          tagify.loading(false)
+          return null
+        }
+
+        // success: clear any previous error state
+        input.classList.remove("is-invalid")
+        const feedback = input.nextElementSibling
+        if (feedback && feedback.classList.contains("invalid-feedback")) {
+          feedback.remove()
+        }
+
+        // parse JSON
+        return await res.json()
+      })
+      .then(data => {
+        if (!data) return
+        currentSuggestions = data.map(toTagItem).filter(Boolean)
+        tagify.whitelist = currentSuggestions
+        tagify.loading(false)
+        tagify.dropdown.show(value)
+      })
+      .catch(err => {
+        if (err.name !== "AbortError") console.error(err)
+        tagify.loading(false)
+      })
+  }
+
+
+  if (autoSubmit) {
+    tagify.on("change", () => form.requestSubmit())
+  }
+
+  // A value that is still being typed has not been added to tagify.value yet.
+  // Commit it when the containing form is submitted so users do not have to
+  // press Enter before submitting a form with a single new tag.
+  if (form && !autoSubmit) {
+    form.addEventListener("submit", () => {
+      const pendingValue = tagify.DOM.input.textContent.trim()
+      if (!pendingValue) return
+
+      tagify.addTags(pendingValue)
+      tagify.DOM.input.textContent = ""
+      tagify.updateValueByDOMTags()
+    }, true)
+  }
+})()
+
+// Enable bootstrap tooltip
+const tooltipTriggerList = document.querySelectorAll("[title], [data-bs-toggle=\"tooltip\"]")
+const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+
+// Publish prompt
+$(".btn-prompt-publish, .btn-prompt-unpublish").on("click", function () {
+  const $btn = $(this)
+  const promptId = $btn.data("prompt-id")
+  const status = $btn.data("status")
+  const url = window.CONFIG.update_prompt_status_url.replace("{prompt_id}", promptId)
+
+  $btn.setButtonLoading()
+
+  $.ajax({
+    url, method: "POST", contentType: "application/json", data: JSON.stringify({status}), success: function () {
+      window.location.reload()
+    }, error: function (xhr) {
+      console.error(`Error on prompt ${status}:`, xhr.responseText)
+      alert(`Failed to ${status} prompt.`)
+    }, complete: function () {
+      $btn.clearButtonLoading()
+    }
+  })
+})
+
+// Reject prompt
+$(".btn-prompt-reject").on("click", function () {
+  const $btn = $(this)
+  const promptId = $btn.data("prompt-id")
+  const status = $btn.data("status")
+  const url = window.CONFIG.update_prompt_status_url.replace("{prompt_id}", promptId)
+  const comment = $btn.closest(".input-group").find("input[name='comment']").val().trim()
+
+  if (!comment) {
+    alert("Please enter a rejection reason.")
+    return
+  }
+
+  $btn.setButtonLoading()
+
+  $.ajax({
+    url,
+    method: "POST",
+    contentType: "application/json",
+    data: JSON.stringify({status, comment}),
+    success: function () {
+      window.location.reload()
+    },
+    error: function (xhr) {
+      console.error("Error rejecting prompt:", xhr.responseText)
+      alert("Failed to reject prompt.")
+    },
+    complete: function () {
+      $btn.clearButtonLoading()
+    }
+  })
+})
+
+// Like/dislike prompt (prompt impression)
+$(document).on("click", ".btn-prompt-like, .btn-prompt-dislike", function () {
+  const $btn = $(this)
+  const promptId = $btn.data("prompt-id")
+  const action = $btn.data("action")
+  const url = window.CONFIG.update_prompt_impression_url.replace("{prompt_id}", promptId)
+
+  $btn.setButtonLoading()
+
+  $.ajax({
+    url, method: "POST", contentType: "application/json", data: JSON.stringify({action}), success: function (res) {
+      $btn.closest(".prompt-impressions").replaceWith(res)
+    }, error: function (xhr) {
+      console.error(`Error on prompt ${action}:`, xhr.responseText)
+      alert(`Failed to ${action} prompt. Please try again.`)
+    }, complete: function () {
+      $btn.clearButtonLoading()
+    }
+  })
+})
+
+// Follow/block user (user impression)
+$(document).on("click", ".btn-user-follow, .btn-user-block", function () {
+  const $btn = $(this)
+  const userId = $btn.data("user-id")
+  const action = $btn.data("action")
+  const url = window.CONFIG.update_user_impression_url.replace("{user_id}", userId)
+
+  $btn.setButtonLoading()
+
+  $.ajax({
+    url, method: "POST", contentType: "application/json", data: JSON.stringify({action}), success: function (res) {
+      $btn.closest(".user-impressions").replaceWith(res)
+    }, error: function (xhr) {
+      console.error(`Error on user ${action}:`, xhr.responseText)
+      alert(`Failed to ${action} user. Please try again.`)
+    }, complete: function () {
+      $btn.clearButtonLoading()
+    }
+  })
+})
+
+// Activate user
+$(".btn-user-activate").on("click", function () {
+  const $btn = $(this)
+  const userId = $btn.data("user-id")
+  const status = $btn.data("status")
+  const url = window.CONFIG.update_user_status_url.replace("{user_id}", userId)
+
+  $btn.setButtonLoading()
+
+  $.ajax({
+    url, method: "POST", contentType: "application/json", data: JSON.stringify({status}), success: function () {
+      window.location.reload()
+    }, error: function (xhr) {
+      console.error("Error activating user:", xhr.responseText)
+      alert("Failed to activate user.")
+    }, complete: function () {
+      $btn.clearButtonLoading()
+    }
+  })
+})
+
+// Ban user
+$(".btn-user-ban").on("click", function () {
+  const $btn = $(this)
+  const userId = $btn.data("user-id")
+  const status = $btn.data("status")
+  const url = window.CONFIG.update_user_status_url.replace("{user_id}", userId)
+  const comment = $btn.closest(".input-group").find("input[name='comment']").val().trim()
+
+  if (!comment) {
+    alert("Please enter a ban reason.")
+    return
+  }
+
+  $btn.setButtonLoading()
+
+  $.ajax({
+    url,
+    method: "POST",
+    contentType: "application/json",
+    data: JSON.stringify({status, comment}),
+    success: function () {
+      window.location.reload()
+    },
+    error: function (xhr) {
+      console.error("Error banning user:", xhr.responseText)
+      alert("Failed to ban user.")
+    },
+    complete: function () {
+      $btn.clearButtonLoading()
+    }
+  })
+})
+
+const getApiErrorMessage = (errorBody, fallbackMessage) => {
+  const details = errorBody?.details
+  if (typeof details === "string" && details) return details
+  if (details && typeof details === "object") {
+    const messages = Object.values(details).filter(Boolean)
+    if (messages.length > 0) return messages.join(" ")
+  }
+  return errorBody?.message || fallbackMessage
+}
+
+const uploadPublicFile = async function (file, progress = undefined) {
+  try {
+    const formData = new FormData()
+    formData.append("file", file)
+
+    // Upload to your existing endpoint
+    const uploadResponse = await ajaxResponse({
+      url: window.CONFIG.upload_public_file_url,
+      method: "POST",
+      data: formData,
+      processData: false,
+      contentType: false,
+      dataType: "json"
+    })
+
+    if (!uploadResponse.ok) {
+      let errorBody = {}
+      try {
+        errorBody = await uploadResponse.json()
+      } catch (_) {
+      }
+      throw new Error(getApiErrorMessage(errorBody, "File upload failed (" + uploadResponse.status + ")"))
+    }
+
+    return await uploadResponse.json()
+  } catch (err) {
+    console.error("Image upload failed:", err)
+    throw err
+  }
+}
+
+if (window.CONFIG.init_tinymce) {
+  $("textarea.editor").tinymce({
+    skin: "bootstrap",
+    plugins: "importcss autolink code fullscreen image link codesample table charmap advlist lists autosave",
+    menubar: false,
+    toolbar: "h2 h3 blockquote bold italic underline strikethrough align numlist bullist outdent indent "
+      + "link image table charmap codesample removeformat code fullscreen",
+    autosave_ask_before_unload: true,
+    contextmenu: false,
+    content_css: ["default", ...window.CONFIG.css_filenames],
+    width: "100%",
+    height: 1000,
+    content_style: "body { min-height: 100%; margin: .75rem!important }",
+    browser_spellcheck: true,
+    powerpaste_allow_local_images: true,
+    powerpaste_word_import: "clean",
+    powerpaste_html_import: "clean",
+    valid_elements: "img[src|alt],"
+      + "h2[id],h3[id],h4[id],h5[id],h6[id],"
+      + "a[href|target|title],"
+      + "b/strong,i/em,u,span[class],"
+      + "ul,ol,li,"
+      + "table[class|border|cellpadding|cellspacing],thead,tbody,tfoot,tr,th[colspan|rowspan],td[colspan|rowspan],"
+      + "div[class],br,p,pre[class],code[class],blockquote",
+    relative_urls: false,
+    convert_urls: false,
+    table_default_attributes: {class: "table"},
+    table_class_list: [
+      {title: "Regular", value: "table"},
+      {title: "Striped", value: "table table-striped"},
+      {title: "Bordered", value: "table table-bordered"}
+    ],
+    link_default_target: "_blank",
+    link_target_list: false,
+    link_context_toolbar: true,
+    images_reuse_filename: true,
+    image_title: false,
+    image_dimensions: false,
+    images_upload_handler: async (blobInfo, progress) => {
+      const filename = await uploadPublicFile(blobInfo.blob(), progress)
+      return window.CONFIG.static_relative_url.replace("{filename}", filename)
+    },
+    codesample_languages: [
+      {text: "HTML/XML", value: "markup"},
+      {text: "JavaScript", value: "javascript"},
+      {text: "TypeScript", value: "typescript"},
+      {text: "Python", value: "python"},
+      {text: "CSS", value: "css"},
+      {text: "SCSS", value: "scss"},
+      {text: "PHP", value: "php"},
+      {text: "Ruby", value: "ruby"},
+      {text: "Go", value: "go"},
+      {text: "C", value: "c"},
+      {text: "C++", value: "cpp"},
+      {text: "C#", value: "csharp"},
+      {text: "Java", value: "java"},
+      {text: "Bash/Shell", value: "bash"},
+      {text: "JSON", value: "json"},
+      {text: "YAML", value: "yaml"},
+      {text: "SQL", value: "sql"}
+    ],
+    setup: (editor) => {
+      editor.on("init", () => {
+        editor.getContainer().style.transition = "border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out"
+      })
+      editor.on("focus", () => {
+        editor.getContainer().style.boxShadow = "0 0 0 .2rem rgba(0, 123, 255, .25)"
+        editor.getContainer().style.borderColor = "#80bdff"
+      })
+      editor.on("blur", () => {
+        editor.getContainer().style.boxShadow = ""
+        editor.getContainer().style.borderColor = ""
+      })
+      editor.on("NodeChange", (e) => {
+        if (e && e.element.nodeName === "TABLE" && !e.element.className) {
+          e.element.className = "table"
+        }
+        if (e && e.element.nodeName === "IMG" && !e.element.alt) {
+          e.element.alt = prompt("Enter a short description (alt text) for the image:", "") || "Image"
+        }
+        if (e && e.element.nodeName === "A") {
+          e.element.target = "_blank"
+          e.element.rel = "noopener noreferrer"
+        }
+      })
+      editor.on("GetContent", function (e) {
+        e.content = e.content
+          .replace(/<p>\s*<\/p>/g, "<br>")
+          .replace(/^(<br\s*\/?>\s*)+/i, "")
+          .replace(/(<br\s*\/?>\s*)+$/i, "")
+          .trim()
+      })
+      editor.on("change keyup", () => {
+        tinymce.triggerSave()
+      })
+    }
+  })
+}
+
+if (typeof Prism !== "undefined") {
+  Prism.plugins.autoloader.languages_path = "https://cdn.jsdelivr.net/npm/prismjs@1.x/components/"
+  Prism.highlightAll()
+}
+
+$(function () {
+  const $cookieAlert = $("#cookie-alert")
+  const $acceptBtn = $("#accept-cookies")
+
+  if (localStorage.getItem("cookiesAccepted")) {
+    $cookieAlert.remove()
+    return
+  }
+
+  $cookieAlert.addClass("show")
+
+  $acceptBtn.on("click", function () {
+    localStorage.setItem("cookiesAccepted", "true")
+    $cookieAlert.fadeOut(300, function () {
+      $(this).remove()
+    })
+  })
+})
+
+$(function () {
+  $(".copy-url button").on("click", function () {
+    const $btn = $(this)
+    const $input = $btn.closest(".input-group").find("input")
+    const textToCopy = $input.val()
+
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      // Temporary icon swap for visual feedback
+      $btn.find("i").removeClass("bi-copy").addClass("bi-check")
+
+      // Create tooltip programmatically
+      const tooltip = new bootstrap.Tooltip($btn[0], {
+        title: "Copied!",
+        placement: "top",
+        trigger: "manual"
+      })
+
+      // Show tooltip and clean up after 1s
+      tooltip.show()
+      setTimeout(() => {
+        tooltip.hide()
+        tooltip.dispose()
+        $btn.find("i").removeClass("bi-check").addClass("bi-copy")
+      }, 1000)
+
+    }).catch(() => {
+      // Fallback for older browsers
+      $input[0].select()
+      document.execCommand("copy")
+    })
+  })
+})
+
+$(function () {
+  const pageUrl = encodeURIComponent(window.location.href)
+  const pageTitle = encodeURIComponent(document.title)
+
+  $(".share-btn.twitter").attr("href", `https://twitter.com/intent/tweet?url=${pageUrl}&text=${pageTitle}`)
+  $(".share-btn.facebook").attr("href", `https://www.facebook.com/sharer/sharer.php?u=${pageUrl}`)
+  $(".share-btn.linkedin").attr("href", `https://www.linkedin.com/shareArticle?mini=true&url=${pageUrl}&title=${pageTitle}`)
+  $(".share-btn.email").attr("href", `mailto:?subject=${pageTitle}&body=Check out this prompt: ${pageUrl}`)
+})
+
+// Tag subscriptions
+$(document).on("click", ".btn-tag-subscription", function () {
+  const button = $(this)
+  const block = button.closest(".tag-subscription-block, .tag-subscription-item")
+  const message = block.find(".tag-subscription-message")
+  button.setButtonLoading()
+  const subscriptionId = button.attr("data-tag-subscription-id")
+  const request = subscriptionId
+    ? $.ajax({
+      url: window.CONFIG.delete_tag_subscription_url.replace("{tag_subscription_id}", subscriptionId),
+      method: "DELETE"
+    })
+    : $.ajax({
+      url: window.CONFIG.create_tag_subscription_url,
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({tags: JSON.parse(button.attr("data-tags"))})
+    })
+  request.done((html) => {
+    if (block.hasClass("tag-subscription-item")) {
+      block.remove()
+      const interestsContent = $("#profile-interests-content")
+      if (interestsContent.length && !interestsContent.find(".tag-subscription-item").length) {
+        interestsContent.html('<div class="text-muted small tag-subscription-empty">You have no interests.</div>')
+      }
+    } else {
+      block.replaceWith(html)
+    }
+  })
+    .fail((xhr) => {
+      message.text(xhr.responseJSON?.detail?.message || "Unable to update tag subscription.");
+      button.clearButtonLoading()
+    })
+})

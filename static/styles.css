@@ -1,0 +1,76 @@
+body {
+    font-family: "Rethink Sans", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+}
+
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+    font-weight: 700;
+}
+
+.tox-tinymce {
+    border: 0 !important;
+}
+
+.tox-tinymce .tox-statusbar {
+    display: none !important;
+}
+
+.form-control.h1 {
+    font-size: 2.5rem;
+    font-weight: 500;
+}
+
+.avatar-letter {
+    font-weight: bold;
+}
+
+.two-line-ellipsis {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.prompt-content img {
+    max-width: 100%
+}
+
+.prompt-content-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.label-required::after {
+    content: " *";
+    color: red;
+}
+
+.activity-calendar-svg {
+    display: block;
+    height: auto;
+}
+
+.activity-calendar-svg .activity-cell-empty {
+    fill: #e9ecef;
+}
+
+.activity-calendar-svg .activity-cell-low {
+    fill: #b7e4c7;
+}
+
+.activity-calendar-svg .activity-cell-medium {
+    fill: #52b788;
+}
+
+.activity-calendar-svg .activity-cell-high {
+    fill: #1b4332;
+}
+
+.activity-calendar-svg .activity-month-label {
+    fill: currentColor;
+    font-size: 10px;
+}
