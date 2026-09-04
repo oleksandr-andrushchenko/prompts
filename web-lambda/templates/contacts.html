@@ -37,24 +37,24 @@
     <p class="small text-secondary">Contact us</p>
 
     <div class="row g-5">
-        <div class="{{ ({"def": 12, "lg": 6, "xl": 8} if show_details else {"def": 12}) | col_classes }} d-flex flex-column gap-4">
+        <div class="{% if show_details %}{{ {"def": 12, "lg": 6, "xl": 8} | col_classes }}{% else %}col-12{% endif %} d-flex flex-column gap-4">
             <form class="row g-3" id="contact-form" novalidate>
-                <label class="{{ {"def": 12} | col_classes }}">
+                <label class="col-12">
                     <input type="text" class="form-control" id="name" name="name" placeholder="Your Name"
                            value="{{ cur_user.name if cur_user else '' }}" required>
                 </label>
 
-                <label class="{{ {"def": 12} | col_classes }}">
+                <label class="col-12">
                     <input type="email" class="form-control" id="email" name="email" placeholder="Your Email"
                            value="{{ cur_user.email if cur_user else '' }}" required>
                 </label>
 
-                <label class="{{ {"def": 12} | col_classes }}">
+                <label class="col-12">
                     <textarea class="form-control" id="message" name="message" placeholder="Your Message" rows="10"
                               required></textarea>
                 </label>
 
-                <div class="{{ {"def": 12} | col_classes }}">
+                <div class="col-12">
                     <button type="submit" class="btn btn-light">
                         Send message
                         <i class="bi bi-chevron-right"></i>

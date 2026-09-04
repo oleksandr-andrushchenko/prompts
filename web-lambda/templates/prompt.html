@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% set layout_assets = {"masonry": true} %}
 {% set prompt_canonical_url = prompt_url(prompt, absolute=True) %}
 {% set prompt_alternate_url = url("prompt", prompt_id=prompt.id, absolute=True) %}
 {% set author_canonical_url = user_url(author, absolute=True) %}
@@ -107,28 +108,45 @@
 {% endblock %}
 
 {% block content %}
-    <div class="row g-5">
-        <div class="col col-12 col-lg-6 col-xl-8 d-flex flex-column">
-            <article>
+    <div class="row g-4">
+        <div class="{{ {"def": 12, "lg": 8} | col_classes }}">
+            <div class="mb-2">
+                {% if prompt.tags %}
+                    <small class="text-secondary bi bi-tags"> Tags:</small>
+                    {% for tag in prompt.tags %}
+                        <a href="{{ prompts_url(tags=[tag]) }}"
+                           class="badge rounded-pill text-bg-light text-decoration-none text-capitalize"
+                           title="Tag">{{ tag }}</a>
+                    {% endfor %}
+                {% endif %}
+
+                <span class="badge rounded-pill text-bg-light" title="Category">{{ prompt.category }}</span>
+
+                {% for output in prompt.outputs %}
+                    <span class="badge rounded-pill text-bg-light" title="Output">{{ output|capitalize }}</span>
+                {% endfor %}
+
+                {% if prompt.models %}
+                    {% for model in prompt.models %}
+                        <span class="badge rounded-pill text-bg-light"
+                              title="Model">{{ model.title }} ({{ model.version }})</span>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <article class="mb-4">
                 <header>
                     <h1 class="mb-0">{{ prompt.title }}</h1>
 
-                    {% if prompt.description %}
-                        <p>{{ prompt.description }}</p>
-                    {% endif %}
-
-                    <div class="d-flex flex-wrap gap-2 mb-2">
-                        <span class="badge text-bg-secondary">{{ prompt.category }}</span>
-                        {% for output in prompt.outputs %}
-                            <span class="badge text-bg-light border">{{ output|capitalize }}</span>
-                        {% endfor %}
-                    </div>
-
-                    {% with rating_size="fs-3", rating_extended=True %}
+                    {% with rating_size="fs-4", rating_extended=True %}
                         {% include "fragments/prompt-rating.html" %}
                     {% endwith %}
 
-                    <p class="small text-secondary">
+                    {% if prompt.description %}
+                        <p class="mb-2">{{ prompt.description }}</p>
+                    {% endif %}
+
+                    <p class="small text-secondary mb-2">
                         By <a href="{{ user_url(author) }}" class="link-secondary">{{ author.name }}</a>
                         {% if prompt.published_at %}
                             &mdash;
@@ -144,7 +162,7 @@
 
                 {% if prompt.image_filenames %}
                     <section class="prompt-results mb-4">
-                        <h2 class="h4">Screenshots</h2>
+                        <h2 class="h5 mb-2 text-decoration-underline">Screenshots</h2>
                         {% set carousel_id = "prompt-output-carousel-" ~ prompt.id %}
                         <div id="{{ carousel_id }}" class="carousel slide" aria-label="Prompt output images">
                             {% if prompt.image_filenames|length > 1 %}
@@ -184,13 +202,13 @@
                 {% endif %}
 
                 <section class="prompt-content mb-4">
-                    <h2 class="h4">Prompt Template</h2>
+                    <h2 class="h5 text-decoration-underline">Prompt Template</h2>
                     <div class="prompt-content-text">{{ prompt.template }}</div>
                 </section>
             </article>
 
-            <section class="prompt-comments">
-                <h3>Comments ({{ prompt.comments_count }})</h3>
+            <section class="prompt-comments mb-4">
+                <h3 class="h5 text-decoration-underline">Comments &mdash; {{ prompt.comments_count }}</h3>
 
                 <div class="d-flex flex-column gap-4">
                     {% include "fragments/prompt-comment-form.html" %}
@@ -213,115 +231,52 @@
             </section>
         </div>
 
-        <div class="col col-12 col-lg-6 col-xl-4 d-flex flex-column gap-4 border-start">
-            <section class="d-flex flex-column gap-3">
-                <h2 class="h5 mb-0 text-decoration-underline">Author</h2>
-                {% with user=author,
-                    h_tag_size=3,
-                    image_column_size={"def":3,"md":2},
-                    border=False %}
-                    {% include "fragments/user.html" %}
+        <div class="{{ {"def": 12, "lg": 4} | col_classes }}">
+            <aside class="sticky-lg-top" style="top: 1rem;">
+                <section class="mb-4">
+                    <h2 class="h5 text-decoration-underline">Author</h2>
+                    {% with user=author, h_tag_size=3, image_column_size={"def":3,"md":2}, user_bg_color="light", user_shadow=True %}
+                        {% include "fragments/user.html" %}
+                    {% endwith %}
+                </section>
+
+                {% with user=author %}
+                    {% include "fragments/bmc-donate.html" %}
                 {% endwith %}
-            </section>
 
-            {% with user=author %}
-                {% include "fragments/bmc-donate.html" %}
-            {% endwith %}
-
-            <section class="d-flex flex-column gap-3">
-                <h2 class="h5 mb-0 text-decoration-underline">Prompt info</h2>
-                {% if prompt.models %}
-                    <div>
-                        <strong>Models:</strong>
-                        {% for model in prompt.models %}
-                            <span class="badge text-bg-light border">{{ model.title }} ({{ model.version }})</span>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-                <div class="d-flex flex-column gap-1">
-                    {% if prompt.tags %}
-                        <div>
-                            <small class="text-secondary bi bi-tags"> Tags:</small>
-                            {% for tag in prompt.tags %}
-                                <a href="{{ prompts_url(tags=[tag]) }}" class="btn btn-light btn-sm">
-                                    {{ tag }}
-                                </a>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-
-                    {% if prompt.status == PromptStatus.REJECTED %}
-                        <div>
-                            <small class="text-secondary">Status:</small>
-                            <span class="badge text-bg-danger fs-5" title="{{ prompt.comment }}">Rejected</span>
-                        </div>
-                    {% elif prompt.status == PromptStatus.UNPUBLISHED %}
-                        <div>
-                            <small class="text-secondary">Status:</small>
-                            <span class="badge text-bg-warning fs-6">Unpublished (Pending)</span>
-                        </div>
-                    {% endif %}
-
-                    <div>
-                        <small class="text-secondary bi bi-calendar2"> Created:</small>
-                        {{ (prompt.created_at / 1000) | unix_to_full_date }}
-
-                        {% if prompt.updated_at %}
-                            <br>
-                            <small class="text-secondary">Updated:</small>
-                            {{ (prompt.updated_at / 1000) | unix_to_full_date }}
-                        {% endif %}
-
-                        {% if prompt.published_at %}
-                            <br>
-                            <small class="text-secondary">Published:</small>
-                            {{ (prompt.published_at / 1000) | unix_to_full_date }}
-                        {% endif %}
-                    </div>
-                </div>
-            </section>
-
-            <section class="d-flex flex-column gap-3">
-                <h2 class="h5 mb-0 text-decoration-underline">Prompt actions</h2>
-                <div class="d-flex flex-column gap-1">
+                <div class="mb-4">
                     {% include "fragments/prompt-status.html" %}
                     {% include "fragments/prompt-impressions.html" %}
 
                     {% if cur_user and check_auth(cur_user, Permission.UPDATE_PROMPT, prompt) %}
-                        <div>
-                            <a href="{{ url("edit-prompt", prompt_id=prompt.id) }}"
-                               class="btn btn-light bi bi-pencil">
-                                Edit prompt
-                            </a>
-                        </div>
+                        <a href="{{ url("edit-prompt", prompt_id=prompt.id) }}" class="btn btn-light bi bi-pencil">
+                            Edit prompt
+                        </a>
                     {% endif %}
-
-                    {% with url_to_copy=prompt_alternate_url, copy_url_label="Copy persistent prompt link" %}
-                        {% include "fragments/copy-url.html" %}
-                    {% endwith %}
-
-                    {% with share_label="Share this prompt" %}
-                        {% include "fragments/share.html" %}
-                    {% endwith %}
                 </div>
-            </section>
 
-            {% if related_prompts %}
-                <section class="d-flex flex-column gap-3">
-                    <h2 class="h5 mb-0 text-decoration-underline">Related prompts</h2>
-                    <div id="related-prompts" class="d-flex flex-column gap-3">
-                        {% with prompts=related_prompts,
+                {% with share_label="Share this prompt" %}
+                    {% include "fragments/share.html" %}
+                {% endwith %}
+            </aside>
+        </div>
+    </div>
+
+    {% if related_prompts %}
+        <section>
+            <h2 class="h5 text-decoration-underline">Related prompts</h2>
+            <div id="related-prompts" class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3"
+                 data-masonry='{"percentPosition": true }'>
+                {% with prompts=related_prompts,
                             preview=False,
                             border=False,
                             vert_gap=0,
                             h_tag_size=3,
                             h_display_size=6,
                             image_order_size={"def":12} %}
-                            {% include "fragments/prompts.html" %}
-                        {% endwith %}
-                    </div>
-                </section>
-            {% endif %}
-        </div>
-    </div>
+                    {% include "fragments/prompts.html" %}
+                {% endwith %}
+            </div>
+        </section>
+    {% endif %}
 {% endblock %}

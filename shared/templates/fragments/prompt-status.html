@@ -1,5 +1,5 @@
 {% if prompt.status != PromptStatus.PUBLISHED and cur_user and check_auth(cur_user, Permission.UPDATE_PROMPT_STATUS) %}
-    <div class="input-group">
+    <div class="input-group d-inline-block">
         <!-- Publish Prompt -->
         {% set is_published = prompt.status == PromptStatus.PUBLISHED %}
         <button type="button"

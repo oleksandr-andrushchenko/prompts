@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% set layout_assets = {"masonry": true} %}
 {% set main_class = "" %}
 {% set user_canonical_url = user_url(user, absolute=True) %}
 {% set user_alternate_url = url("user", user_id=user.id, absolute=True) %}
@@ -70,11 +71,11 @@
         <div class="container">
             <div class="p-3 p-lg-4">
                 <div class="row align-items-center g-4">
-                    <div class="col-12 col-sm-3 col-lg-2">
+                    <div class="{{ {"def": 12, "sm": 3, "lg": 2} | col_classes }}">
                         {% include "fragments/user-avatar.html" %}
                     </div>
 
-                    <div class="col-12 col-sm-9 col-lg-10">
+                    <div class="{{ {"def": 12, "sm": 9, "lg": 10} | col_classes }}">
                         <h1 class="mb-0">{{ user.name }}</h1>
 
                         {% if user.username %}
@@ -165,7 +166,7 @@
                         {% if cur_user and check_auth(cur_user, Permission.UPDATE_USER, user) %}
                             <div>
                                 <a href="{{ url("edit-user", user_id=user.id) }}"
-                                   class="btn btn-dark btn-sm bi bi-pencil">
+                                   class="btn btn-light btn-sm bi bi-pencil">
                                     Edit profile
                                 </a>
                             </div>
@@ -177,19 +178,19 @@
     </section>
 
     <div class="container">
-        {% if user.about %}
-            <div class="mb-4">
-                <h2 class="h5 mb-2 text-decoration-underline">About</h2>
-                <div class="card-text">{{ user.about }}</div>
-            </div>
-        {% endif %}
-
         <div class="row mb-4">
-            <div class="col col-12 col-lg-6 col-xl-8">
+            <div class="{{ {"def": 12, "lg": 8} | col_classes }}">
+                {% if user.about %}
+                    <div class="mb-4">
+                        <h2 class="h5 mb-2 text-decoration-underline">About</h2>
+                        <div class="card-text">{{ user.about }}</div>
+                    </div>
+                {% endif %}
+
                 {% include "fragments/user-activities.html" %}
             </div>
 
-            <div class="col col-12 col-lg-6 col-xl-4 border-start">
+            <div class="{{ {"def": 12, "lg": 4} | col_classes }}">
                 {% if user.published_prompts_count %}
                     {% with header="Enjoy this author’s work?" %}
                         {% include "fragments/bmc-donate.html" %}
@@ -234,7 +235,7 @@
             {% endif %}
 
             {% if prompts %}
-                <div id="prompts" class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-2"
+                <div id="prompts" class="{{ {"def": 1, "sm": 2, "lg": 4} | row_classes }} g-3"
                      data-masonry='{"percentPosition": true }'>
                     {% with prompt_img_sizes={"1400px": "196px", "1200px": "166px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
                         {% include "fragments/prompts.html" %}

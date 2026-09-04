@@ -1,7 +1,5 @@
 {% extends "layout.html" %}
 {% set layout_assets = {"masonry": true} %}
-
-
 {% set meta_title = site_name ~ " - " ~ site_short_desc %}
 {% set main_class = "" %}
 {% set meta_robots = "index, follow" %}
@@ -44,120 +42,115 @@
     </section>
 
     <div class="container">
-        <div class="row g-5">
-            <div class="{{ {"def": 12, "lg": 8} | col_classes }}">
-                <section class="mb-4">
-                    <h2 class="h5 mb-2 text-decoration-underline">Popular tags</h2>
-                    {% if popular_tags %}
-                        <div class="{{ {"def": 2, "sm": 3, "md": 4} | row_classes }} g-2 mb-2"
-                             data-masonry='{"percentPosition": true }'>
-                            {% for tag in popular_tags[:20] %}
-                                {% include "fragments/tag.html" %}
-                            {% endfor %}
-                        </div>
+        <section class="mb-4">
+            <h2 class="h5 mb-2 text-decoration-underline">Popular tags</h2>
+            {% if popular_tags %}
+                <div class="{{ {"def": 2, "sm": 3, "md": 4} | row_classes }} g-3 mb-2"
+                     data-masonry='{"percentPosition": true }'>
+                    {% for tag in popular_tags[:20] %}
+                        {% include "fragments/tag.html" %}
+                    {% endfor %}
+                </div>
 
-                        {% for tag in popular_tags[20:] %}
-                            <a href="{{ prompts_url(tags=[tag.slug]) }}" class="btn btn-light btn-sm tag mb-1">
-                                <h3 class="h6 fw-normal mb-0">{{ tag.name }} &mdash; {{ tag.prompts_count }}</h3>
-                            </a>
-                        {% endfor %}
+                {% for tag in popular_tags[20:] %}
+                    <a href="{{ prompts_url(tags=[tag.slug]) }}" class="btn btn-light btn-sm tag mb-1">
+                        <h3 class="h6 fw-normal mb-0">{{ tag.name }} &mdash; {{ tag.prompts_count }}</h3>
+                    </a>
+                {% endfor %}
 
-                        <a href="{{ url("tags") }}?type=popular" class="btn btn-light btn-sm bi bi-tags">
-                            See all popular tags
-                        </a>
-                        <a href="{{ url("tags") }}" class="btn btn-light btn-sm bi bi-tags">
-                            See all tags
-                        </a>
-                    {% else %}
-                        <div>N/A</div>
-                    {% endif %}
-                </section>
+                <a href="{{ url("tags") }}?type=popular" class="btn btn-light btn-sm bi bi-tags">
+                    See all popular tags
+                </a>
+                <a href="{{ url("tags") }}" class="btn btn-light btn-sm bi bi-tags">
+                    See all tags
+                </a>
+            {% else %}
+                <div>N/A</div>
+            {% endif %}
+        </section>
 
-                <section class="mb-4">
-                    <h2 class="h5 mb-2">
-                        <a href="{{ users_url(type=UserQueryType.POPULAR) }}" class="link-body-emphasis">
-                            Popular authors
-                        </a>
-                    </h2>
-                    {% if popular_users %}
-                        <div id="popular-users" class="{{ {"def": 1, "sm": 2} | row_classes }} g-2 mb-2"
-                             data-masonry='{"percentPosition": true }'>
-                            {% with users=popular_users,
+        <section class="mb-4">
+            <h2 class="h5 mb-2">
+                <a href="{{ users_url(type=UserQueryType.POPULAR) }}" class="link-body-emphasis">
+                    Popular creators
+                </a>
+            </h2>
+            {% if popular_users %}
+                <div id="popular-users" class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3 mb-2"
+                     data-masonry='{"percentPosition": true }'>
+                    {% with users=popular_users,
                             vert_gap=0,
                             h_tag_size=3,
                             h_display_size=5,
                             image_column_size={"def":3,"md":2},
                             user_avatar_img_sizes={"1400px": "49px", "1200px": "40px", "992px": "56px", "768px": "96px", "default": "120px"} %}
-                                {% include "fragments/users.html" %}
-                            {% endwith %}
+                        {% include "fragments/users.html" %}
+                    {% endwith %}
 
-                            {% if should_show_become_an_author %}
-                                <div class="col">
-                                    {% include "fragments/become-an-author.html" %}
-                                </div>
-                            {% endif %}
+                    {% if should_show_become_an_author %}
+                        <div class="col">
+                            {% include "fragments/become-an-author.html" %}
                         </div>
-
-                        <a href="{{ users_url(type=UserQueryType.POPULAR) }}" class="btn btn-light btn-sm bi bi-heart">
-                            See all popular authors
-                        </a>
-                    {% else %}
-                        <div>N/A</div>
                     {% endif %}
-                </section>
+                </div>
 
-                {% if should_show_become_an_author and not popular_users %}
-                    {% include "fragments/become-an-author.html" %}
-                {% endif %}
-            </div>
+                <a href="{{ users_url(type=UserQueryType.POPULAR) }}" class="btn btn-light btn-sm bi bi-heart">
+                    See all popular authors
+                </a>
+            {% else %}
+                <div>N/A</div>
+            {% endif %}
+        </section>
 
-            <div class="{{ {"def": 12, "lg": 4} | col_classes }} border-start">
-                {% if show_popular_prompts %}
-                    <section class="mb-4">
-                        <h2 class="h5 mb-2">
-                            <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}" class="link-body-emphasis">
-                                Popular prompts
-                            </a>
-                        </h2>
-                        {% if popular_prompts %}
-                            <div id="popular-prompts" class="{{ {"def": 1} | row_classes }} g-2 mb-2">
-                                {% with prompts=popular_prompts,
+        {% if should_show_become_an_author and not popular_users %}
+            {% include "fragments/become-an-author.html" %}
+        {% endif %}
+
+        {% if show_popular_prompts %}
+            <section class="mb-4">
+                <h2 class="h5 mb-2">
+                    <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}" class="link-body-emphasis">
+                        Popular prompts
+                    </a>
+                </h2>
+                {% if popular_prompts %}
+                    <div id="popular-prompts" class="{{ {"def": 1, "sm": 2} | row_classes }} g-3 mb-2"
+                         data-masonry='{"percentPosition": true }'>
+                        {% with prompts=popular_prompts,
                                 preview=False,
                                 vert_gap=0,
                                 h_display_size=6,
                                 horizontal=True,
                                 prompt_img_sizes={"1400px": "86px", "1200px": "71px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
-                                    {% include "fragments/prompts.html" %}
-                                {% endwith %}
-                            </div>
+                            {% include "fragments/prompts.html" %}
+                        {% endwith %}
+                    </div>
 
-                            <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}"
-                               class="btn btn-light btn-sm bi bi-star">
-                                See all popular prompts
-                            </a>
-                            <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}"
-                               class="btn btn-light btn-sm bi bi-tags">
-                                Search popular prompts by tags
-                            </a>
-                        {% else %}
-                            <div>N/A</div>
-                        {% endif %}
-                    </section>
+                    <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}"
+                       class="btn btn-light btn-sm bi bi-star">
+                        See all popular prompts
+                    </a>
+                    <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}"
+                       class="btn btn-light btn-sm bi bi-tags">
+                        Search popular prompts by tags
+                    </a>
+                {% else %}
+                    <div>N/A</div>
                 {% endif %}
+            </section>
+        {% endif %}
 
-                <section class="mb-4">
-                    <h2 class="h5 mb-2 text-decoration-underline">Latest comments</h2>
-                    {% if latest_prompt_comments %}
-                        <div id="latest-prompt-comments"
-                             class="{{ {"def": 1, "sm": 2, "lg": 1} | row_classes }} g-2 mb-2">
-                            {% include "fragments/latest-prompt-comments.html" %}
-                        </div>
-                    {% else %}
-                        <div>N/A</div>
-                    {% endif %}
-                </section>
-            </div>
-        </div>
+        <section class="mb-4">
+            <h2 class="h5 mb-2 text-decoration-underline">Latest comments</h2>
+            {% if latest_prompt_comments %}
+                <div id="latest-prompt-comments" class="{{ {"def": 1, "sm": 3} | row_classes }} g-3 mb-2"
+                     data-masonry='{"percentPosition": true }'>
+                    {% include "fragments/latest-prompt-comments.html" %}
+                </div>
+            {% else %}
+                <div>N/A</div>
+            {% endif %}
+        </section>
 
         <section>
             <h2 class="h5 mb-2">

@@ -1,6 +1,6 @@
 <form class="d-flex flex-column gap-2" id="tag-form" novalidate>
     <div class="form-group row align-items-center">
-        <div class="{{ {"def": 2} | col_classes }}">
+        <div class="col-2">
             {% if tag and tag.image_filename %}
                 <img src="{{ static_url(tag.image_filename) }}"
                      alt="{{ tag.name }}" class="w-100 h-100 object-fit-cover rounded">
@@ -11,7 +11,7 @@
                 </div>
             {% endif %}
         </div>
-        <div class="{{ {"def": 10} | col_classes }}">
+        <div class="col-10">
             <div class="row align-items-center g-3">
                 <div class="{{ {"def": 6, "lg": 4, "xl": 2} | col_classes }}">
                     <div class="form-check text-decoration-underline">
@@ -48,15 +48,15 @@
     </div>
 
     <div class="form-group row">
-        <label for="name" class="col-form-label {{ {"def": 2} | col_classes }} label-required">Name</label>
-        <div class="{{ {"def": 10} | col_classes }}">
+        <label for="name" class="col-form-label col-2 label-required">Name</label>
+        <div class="col-10">
             <input type="text" class="form-control" id="name" name="name" placeholder="Name"
                    value="{{ tag.name if tag and tag.name else "" }}">
         </div>
     </div>
 
     <div class="form-group row">
-        <div class="{{ {"def": 10} | col_classes }} offset-2">
+        <div class="col-10 offset-2">
             <button type="submit" class="btn btn-light">
                 <i class="bi {% if tag %}bi-arrow-clockwise{% else %}bi-plus-lg{% endif %}"></i>
                 {% if tag %}Update{% else %}Create{% endif %} tag

@@ -1,11 +1,11 @@
-<div class="card-body">
+<div class="card-body overflow-hidden">
     <a class="link-body-emphasis text-decoration-none" href="{{ user_url(user) }}">
-        <h{{ h_tag_size }} class="h{{ h_display_size }} mb-1 card-title text-truncate w-75">
+        <h{{ h_tag_size }} class="h{{ h_display_size }} mb-1 card-title text-truncate">
             {{ user.name }}
         </h{{ h_tag_size }}>
 
         {% if user.headline %}
-            <div class="card-text text-truncate w-75 mb-1">
+            <div class="card-text text-truncate mb-1">
                 {{ user.headline }}
             </div>
         {% endif %}
