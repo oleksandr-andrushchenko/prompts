@@ -33,14 +33,12 @@ def create_dummy_fixtures(req=None) -> None:
         return
     created_prompts = []
     created_users = []
-    generated_image_filenames = [
+    fixture_image_filenames = [
         "3d7af01f-819e-4c2f-bc69-eb7245b76a74_1809x1247.png",
         "45e97e68-a321-4657-9956-e942d9d757a7_1279x518.png",
-        "4fdd2dcc-8c7d-40ac-80a6-647c828af338_1000x376.png",
         "5b027ec7-c018-4744-9eda-00abf75cf685_1111x712.png",
         "6a5118c0-a073-483b-ac5b-79e0a554e703_988x494.png",
         "a167891d-7e91-40d6-a5c4-1a3ddb27dcc2_1575x842.png",
-        "ebdbe93d-99ec-4a47-b821-f4dfe0da769b_798x475.png",
     ]
     used_user_names = {"John Doe"}
     used_prompt_titles = set()
@@ -81,13 +79,7 @@ def create_dummy_fixtures(req=None) -> None:
         extra_tags = random.sample(available_tags, random.randint(0, 2))
         return [required_tag, *extra_tags] if required_tag else random.sample(fixture_tag_names, random.randint(1, 3))
 
-    def random_figure(alt: str) -> str:
-        if random.random() >= 0.5:
-            return ""
-        filename = random.choice(generated_image_filenames)
-        return f"<img src=\"/{filename}\" alt=\"{alt}\">"
-
-    def random_prompt_content(alt: str) -> str:
+    def random_prompt_template() -> str:
         paragraphs = []
         for _ in range(random.randint(10, 16)):
             sentences = [
@@ -95,15 +87,18 @@ def create_dummy_fixtures(req=None) -> None:
                 f"{random.choice(content_actions)} {random.choice(content_endings)}"
                 for _ in range(random.randint(4, 7))
             ]
-            paragraphs.append("<p>" + " ".join(sentences) + "</p>")
-        content = "".join(paragraphs)
-        while len(content) < 5000:
-            sentence = ("<p>" + f"{random.choice(content_openers)} {random.choice(content_subjects)} "
+            paragraphs.append(" ".join(sentences))
+        template = "\n\n".join(paragraphs)
+        while len(template) < 5000:
+            paragraph = (f"{random.choice(content_openers)} {random.choice(content_subjects)} "
                         f"{random.choice(content_actions)} {random.choice(content_endings)} "
                         f"{random.choice(content_openers)} {random.choice(content_subjects)} "
-                        f"{random.choice(content_actions)} {random.choice(content_endings)}</p>")
-            content += sentence
-        return random_figure(alt) + content
+                        f"{random.choice(content_actions)} {random.choice(content_endings)}")
+            template += "\n\n" + paragraph
+        return template
+
+    def random_prompt_images() -> list[str]:
+        return random.sample(fixture_image_filenames, random.randint(0, 3))
 
     user_token = get_dummy_user_token()
     root_user = upsert_user_by_user_token(user_token)
@@ -152,8 +147,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A generated distributed-systems prompt.",
             category="Code & Dev",
             outputs=["text"],
-            template=random_prompt_content("Message Queues Explained: Producers, Consumers, and Brokers"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
         PromptDTO(
@@ -161,8 +157,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A generated distributed-systems prompt.",
             category="Code & Dev",
             outputs=["text"],
-            template=random_prompt_content("Event-Driven Architecture: Connecting Services with Events"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
         PromptDTO(
@@ -170,8 +167,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A generated distributed-systems prompt.",
             category="Code & Dev",
             outputs=["text"],
-            template=random_prompt_content("Designing Reliable Distributed Systems"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
     ]
@@ -192,8 +190,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A generated distributed-systems prompt.",
             category="Code & Dev",
             outputs=["text"],
-            template=random_prompt_content("Scaling Systems: From a Single Service to a Platform"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
         PromptDTO(
@@ -201,8 +200,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A generated distributed-systems prompt.",
             category="Code & Dev",
             outputs=["text"],
-            template=random_prompt_content("Distributed systems fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
         PromptDTO(
@@ -210,8 +210,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A generated distributed-systems prompt.",
             category="Code & Dev",
             outputs=["text"],
-            template=random_prompt_content("Platform architecture fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
     ]
@@ -227,8 +228,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A generated fixture prompt.",
             category="Other",
             outputs=["text"],
-            template=random_prompt_content("Generated fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags(),
         ), root_user)
         update_prompt_status(
@@ -284,8 +286,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="An unpublished fixture prompt.",
             category="Other",
             outputs=["text"],
-            template=random_prompt_content("Unpublished fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
         PromptDTO(
@@ -293,8 +296,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="An unpublished fixture prompt.",
             category="Other",
             outputs=["text"],
-            template=random_prompt_content("Unpublished fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
         PromptDTO(
@@ -302,8 +306,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="An unpublished fixture prompt.",
             category="Other",
             outputs=["text"],
-            template=random_prompt_content("Unpublished fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
     ]
@@ -315,8 +320,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A rejected fixture prompt.",
             category="Other",
             outputs=["text"],
-            template=random_prompt_content("Rejected fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
         PromptDTO(
@@ -324,8 +330,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A rejected fixture prompt.",
             category="Other",
             outputs=["text"],
-            template=random_prompt_content("Rejected fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
         PromptDTO(
@@ -333,8 +340,9 @@ def create_dummy_fixtures(req=None) -> None:
             description="A rejected fixture prompt.",
             category="Other",
             outputs=["text"],
-            template=random_prompt_content("Rejected fixture prompt"),
+            template=random_prompt_template(),
             models=["openai-gpt-4o"],
+            image_filenames=random_prompt_images(),
             tags=random_prompt_tags()
         ),
     ]
