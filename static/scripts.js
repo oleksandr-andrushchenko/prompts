@@ -132,7 +132,12 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
           fieldRules[fieldRuleId] = {
             validator: (value) => {
               if (!value) return true
-              const values = JSON.parse(value)
+              let values
+              try {
+                values = JSON.parse(value)
+              } catch (error) {
+                return false
+              }
               if (!Array.isArray(values)) return true
               const items = values.map(item => toKebabCase(item.value)).filter(Boolean)
               return items.length >= minCnt && items.length <= maxCnt && items.every(t => t.length >= minLen && t.length <= maxLen)
@@ -170,7 +175,15 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
       if (input.type === "radio") {
         if (input.checked) data[input.name] = input.value
       } else if (input.type === "checkbox") {
-        data[input.name] = input.checked
+        const sameNameCheckboxes = form.querySelectorAll(`input[type="checkbox"][name="${input.name}"]`)
+        if (sameNameCheckboxes.length > 1) {
+          if (!Array.isArray(data[input.name])) data[input.name] = []
+          if (input.checked) data[input.name].push(input.value)
+        } else {
+          data[input.name] = input.checked
+        }
+      } else if (input.multiple) {
+        data[input.name] = Array.from(input.selectedOptions).map(option => option.value)
       } else {
         const value = input.value.trim()
         data[input.name] = value === "" ? null : value
@@ -179,8 +192,15 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
     })
 
     if (hasTags) {
-      const values = JSON.parse(form.tags.value)
-      data.tags = values.map(item => toKebabCase(item.value)).filter(Boolean)
+      let values = []
+      try {
+        values = JSON.parse(form.tags.value || "[]")
+      } catch (error) {
+        values = []
+      }
+      data.tags = Array.isArray(values)
+        ? values.map(item => toKebabCase(typeof item === "string" ? item : item.value)).filter(Boolean)
+        : []
     }
 
     let msgClass = "danger"
@@ -416,7 +436,8 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
   })[char])
 
   const tagify = new Tagify(input, {
-    whitelist: [], // maxTags: 3,
+    whitelist: [],
+    maxTags: 3,
     tagTextProp: "name",
     enforceWhitelist: false, // validate: tag => /^[0-9A-Za-z-.#]{2,20}$/.test(tag.value) || "Invalid tag",
     transformTag(tagData) {

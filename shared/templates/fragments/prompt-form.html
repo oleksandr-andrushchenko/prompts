@@ -2,18 +2,22 @@
     <div class="col col-12 col-lg-6 col-xl-8">
         <label class="w-100">
             <textarea class="form-control h1 border-0" id="title" name="title" placeholder="Title"
-                      required rows="1" autofocus>{{ prompt.title if prompt else "" }}</textarea>
+                      required maxlength="140" rows="1" autofocus>{{ prompt.title if prompt else "" }}</textarea>
         </label>
     </div>
 
     <div class="col col-12 col-lg-6 col-xl-8 d-flex flex-column gap-2">
         <label class="w-100">
-            <textarea class="form-control editor" id="content" name="content" placeholder="Actual prompt" rows="8"
-                      required minlength="1" maxlength="100000">{{ prompt.content if prompt else "" }}</textarea>
+            <textarea class="form-control" id="description" name="description"
+                      placeholder="Description" required maxlength="400">{{ prompt.description if prompt else "" }}</textarea>
+        </label>
+        <label class="w-100">
+            <textarea class="form-control editor" id="template" name="template" placeholder="Prompt template (use double-brace parameters)" rows="8"
+                      required minlength="1" maxlength="100000">{{ prompt.template if prompt else "" }}</textarea>
         </label>
         <div class="w-100">
             <div class="result-images-widget" id="result-images-widget">
-                <label class="form-label text-secondary mb-1" for="image_files">Result images:</label>
+                <label class="form-label text-secondary mb-1" for="image_files">Cover images (up to 8):</label>
                 <input type="hidden" id="image_filenames" name="image_filenames"
                        value="{{ prompt.image_filenames|join(", ") if prompt else "" }}">
                 <input class="form-control" type="file" id="image_files" accept="image/jpeg,image/png,image/gif" multiple data-form-ignore>
@@ -28,16 +32,47 @@
     </div>
 
     <div class="col col-12 col-lg-6 col-xl-4 d-flex flex-column gap-2">
-        <label class="w-100">
-            <span class="text-secondary">Model:</span>
-            <select class="form-select" name="model_slug">
-                <option value="" data-version="" {% if not prompt or not prompt.model %}selected{% endif %}>Model not specified</option>
-                {% for model in PROMPT_MODELS %}
-                    <option value="{{ model.slug }}" data-version="{{ model.version }}" {% if prompt and prompt.model and prompt.model.slug == model.slug %}selected{% endif %}>{{ model.title }} ({{ model.version }})</option>
+        <fieldset>
+            <legend class="col-form-label text-secondary">Category:</legend>
+            <div class="row row-cols-1 row-cols-sm-2 g-2">
+                {% for category in PROMPT_CATEGORIES %}
+                    <div class="col">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="category" id="category-{{ loop.index }}"
+                                   value="{{ category.value }}" required
+                                   {% if prompt and prompt.category == category.value %}checked{% endif %}>
+                            <label class="form-check-label" for="category-{{ loop.index }}">{{ category.value }}</label>
+                        </div>
+                    </div>
                 {% endfor %}
-            </select>
-            <input type="hidden" name="model_version" value="{{ prompt.model.version if prompt and prompt.model else "" }}">
-        </label>
+            </div>
+        </fieldset>
+        <fieldset>
+            <legend class="col-form-label text-secondary">Output:</legend>
+            <div class="d-flex flex-wrap gap-3">
+                {% for output in PROMPT_OUTPUTS %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="outputs" id="output-{{ loop.index }}"
+                               value="{{ output.value }}" {% if prompt and output.value in prompt.outputs %}checked{% endif %}>
+                        <label class="form-check-label" for="output-{{ loop.index }}">{{ output.value|capitalize }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="form-text">Choose one or more output types.</div>
+        </fieldset>
+        <fieldset>
+            <legend class="col-form-label text-secondary">Recommended models:</legend>
+            <div class="d-flex flex-column gap-2">
+                {% for model in PROMPT_MODELS %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="models" id="model-{{ loop.index }}"
+                               value="{{ model.slug }}"
+                               {% if prompt and model.slug in (prompt.models | map(attribute="slug") | list) %}checked{% endif %}>
+                        <label class="form-check-label" for="model-{{ loop.index }}">{{ model.title }} ({{ model.version }})</label>
+                    </div>
+                {% endfor %}
+            </div>
+        </fieldset>
 
         <small class="text-secondary bi bi-tags"> Tags:</small>
         {% with url=url("get-tags", absolute=True), value=prompt.tags if prompt else [] %}
@@ -60,17 +95,30 @@
       rules: {
         title: [
           {rule: "required"},
-          {rule: "minLength", value: 10},
-          {rule: "maxLength", value: 500}
+          {rule: "maxLength", value: 140}
         ],
-        content: [
+        description: [
+          {rule: "required"},
+          {rule: "maxLength", value: 400}
+        ],
+        category: [
+          {rule: "required"}
+        ],
+        outputs: [
+          {validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="outputs"]:checked').length > 0,
+           errorMessage: "Select at least one output type"}
+        ],
+        models: [
+          {validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="models"]:checked').length > 0,
+           errorMessage: "Select at least one recommended model"}
+        ],
+        template: [
           {rule: "required"},
           {rule: "minLength", value: 1},
           {rule: "maxLength", value: 100_000}
         ],
         tags: [
-          {rule: "required"},
-          {rule: "tags", minCnt: 1, maxCnt: 3, minLen: 2, maxLen: 40}
+          {rule: "tags", minCnt: 0, maxCnt: 3, minLen: 2, maxLen: 40}
         ]
       },
       onSuccess: (res) => {
@@ -80,7 +128,7 @@
         const widget = document.getElementById("result-images-widget")
         const items = widget._imageItems || []
         const uploaded = await Promise.all(items.filter(item => item.upload).map(item => uploadPublicFile(item.file)))
-        const values = [...items.filter(item => !item.upload).map(item => item.value), ...uploaded]
+        const values = [...items.filter(item => !item.upload).map(item => item.value), ...uploaded].slice(0, 8)
         data.image_filenames = values.length ? values.join(", ") : null
         document.getElementById("image_filenames").value = data.image_filenames || ""
       },

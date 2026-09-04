@@ -15,7 +15,7 @@
 {% set prompt_og_modified_time = prompt.updated_at | iso_utc if prompt.updated_at and prompt.published_at else None %}
 {% set prompt_og_tags = prompt.tags %}
 {% block meta_schema %}
-    {% set prompt_body = prompt.content %}
+    {% set prompt_body = prompt.template %}
     {% set prompt_image_url = prompt.image_filenames[0] if prompt.image_filenames[0] and (prompt.image_filenames[0].startswith('http://') or prompt.image_filenames[0].startswith('https://')) else static_url(prompt.image_filenames[0], absolute=True) if prompt.image_filenames[0] else None %}
     {% set comment_schemas = namespace(values=[]) %}
     {% for prompt_comment in comments %}
@@ -113,6 +113,17 @@
                 <header>
                     <h1 class="mb-0">{{ prompt.title }}</h1>
 
+                    {% if prompt.description %}
+                        <p>{{ prompt.description }}</p>
+                    {% endif %}
+
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <span class="badge text-bg-secondary">{{ prompt.category }}</span>
+                        {% for output in prompt.outputs %}
+                            <span class="badge text-bg-light border">{{ output|capitalize }}</span>
+                        {% endfor %}
+                    </div>
+
                     {% with rating_size="fs-3", rating_extended=True %}
                         {% include "fragments/prompt-rating.html" %}
                     {% endwith %}
@@ -133,20 +144,48 @@
 
                 {% if prompt.image_filenames %}
                     <section class="prompt-results mb-4">
-                        <h2 class="h4">Results</h2>
-                        <div class="d-flex flex-wrap gap-3">
-                            {% for filename in prompt.image_filenames %}
-                                {% with filename=filename, alt=prompt.title, img_class="img-fluid rounded", figure=True %}
-                                    {% include "fragments/image.html" %}
-                                {% endwith %}
-                            {% endfor %}
+                        <h2 class="h4">Screenshots</h2>
+                        {% set carousel_id = "prompt-output-carousel-" ~ prompt.id %}
+                        <div id="{{ carousel_id }}" class="carousel slide" aria-label="Prompt output images">
+                            {% if prompt.image_filenames|length > 1 %}
+                                <div class="carousel-indicators">
+                                    {% for filename in prompt.image_filenames %}
+                                        <button type="button" data-bs-target="#{{ carousel_id }}"
+                                                data-bs-slide-to="{{ loop.index0 }}"
+                                                class="{% if loop.first %}active{% endif %}"
+                                                aria-current="{% if loop.first %}true{% else %}false{% endif %}"
+                                                aria-label="Output image {{ loop.index }}"></button>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="carousel-inner rounded">
+                                {% for filename in prompt.image_filenames %}
+                                    <div class="carousel-item{% if loop.first %} active{% endif %}">
+                                        {% with filename=filename, alt=prompt.title ~ " output " ~ loop.index, img_class="d-block w-100 img-fluid", img_style="max-height: 70vh; object-fit: contain;", figure=False %}
+                                            {% include "fragments/image.html" %}
+                                        {% endwith %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% if prompt.image_filenames|length > 1 %}
+                                <button class="carousel-control-prev" type="button" data-bs-target="#{{ carousel_id }}"
+                                        data-bs-slide="prev">
+                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Previous output</span>
+                                </button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#{{ carousel_id }}"
+                                        data-bs-slide="next">
+                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Next output</span>
+                                </button>
+                            {% endif %}
                         </div>
                     </section>
                 {% endif %}
 
                 <section class="prompt-content mb-4">
-                    <h2 class="h4">Prompt</h2>
-                    <div class="prompt-content-text">{{ prompt.content }}</div>
+                    <h2 class="h4">Prompt Template</h2>
+                    <div class="prompt-content-text">{{ prompt.template }}</div>
                 </section>
             </article>
 
@@ -191,8 +230,13 @@
 
             <section class="d-flex flex-column gap-3">
                 <h2 class="h5 mb-0 text-decoration-underline">Prompt info</h2>
-                {% if prompt.model %}
-                    <div><strong>Model:</strong> {{ prompt.model.title }} ({{ prompt.model.version }})</div>
+                {% if prompt.models %}
+                    <div>
+                        <strong>Models:</strong>
+                        {% for model in prompt.models %}
+                            <span class="badge text-bg-light border">{{ model.title }} ({{ model.version }})</span>
+                        {% endfor %}
+                    </div>
                 {% endif %}
                 <div class="d-flex flex-column gap-1">
                     {% if prompt.tags %}

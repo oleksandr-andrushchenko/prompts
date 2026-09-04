@@ -1,4 +1,44 @@
 from dataclasses import dataclass
+from enum import StrEnum
+
+
+class PromptCategory(StrEnum):
+    DESIGN_IMAGE = "Design & Image"
+    SOCIAL_MEDIA = "Social Media"
+    WRITING_EDITING = "Writing & Editing"
+    DATA_ANALYTICS = "Data & Analytics"
+    PHOTOGRAPHY = "Photography"
+    MARKETING = "Marketing"
+    PRODUCTIVITY = "Productivity"
+    EMAIL_OUTREACH = "Email & Outreach"
+    CODE_DEV = "Code & Dev"
+    BUSINESS_OPS = "Business & Ops"
+    EDUCATION = "Education"
+    PRODUCT_UX = "Product & UX"
+    HR_PEOPLE = "HR & People"
+    CREATIVE_WRITING = "Creative Writing"
+    RESEARCH_DATA = "Research & Data"
+    SALES_CRM = "Sales & CRM"
+    CUSTOMER_SUPPORT = "Customer Support"
+    SEO_GROWTH = "SEO & Growth"
+    ECOMMERCE_RETAIL = "E-commerce & Retail"
+    SCIENCE = "Science"
+    GAMING = "Gaming"
+    MUSIC_AUDIO = "Music & Audio"
+    ART_ILLUSTRATION = "Art & Illustration"
+    LANGUAGES_TRANSLATION = "Languages & Translation"
+    AI_AGENTS_AUTOMATION = "AI Agents & Automation"
+    OTHER = "Other"
+
+
+class PromptOutput(StrEnum):
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+
+
+PROMPT_CATEGORIES = tuple(PromptCategory)
+PROMPT_OUTPUTS = tuple(PromptOutput)
 
 
 @dataclass(frozen=True, slots=True)

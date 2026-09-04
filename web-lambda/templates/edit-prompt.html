@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 
+{% set layout_assets = {"tagify": true, "validation": true} %}
 {% set title = ("Edit " ~ prompt.title) | trim %}
 {% set meta_robots = "noindex, nofollow" %}
 {% set meta_title = title ~ " | " ~ site_name %}

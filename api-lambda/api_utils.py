@@ -355,7 +355,10 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
     status = PromptStatus.UNPUBLISHED
     prompt_id = str(uuid.uuid4())
     title = prompt_dto.title
-    content = prompt_dto.content
+    description = prompt_dto.description
+    category = prompt_dto.category
+    outputs = prompt_dto.outputs
+    template = prompt_dto.template
     image_filenames = prompt_dto.image_filenames
     tags = sanitize_tags(prompt_dto.tags)
     slug = to_kebab_case(title)
@@ -365,10 +368,13 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
     prompt_item = {
         "id": prompt_id,
         "title": title,
+        "description": description,
+        "category": category,
+        "outputs": outputs,
         "prompt_slug": slug,
         "user_id": cur_user.id,
         "user_name": cur_user.name,
-        "content": content,
+        "template": template,
         "image_filenames": image_filenames,
         "tags": tags,
         "rating_sk": compute_rating_sk(0, now),
@@ -377,9 +383,11 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
         "prompt_status_pk": f"PROMPT#{status}",
         "prompt_user_status_pk": f"PROMPT#{cur_user.id}#{status}",
     }
-    model = get_prompt_model(prompt_dto.model_slug, prompt_dto.model_version)
-    if model:
-        prompt_item["model"] = {"title": model.title, "slug": model.slug, "version": model.version}
+    models = [get_prompt_model(model_slug) for model_slug in prompt_dto.models]
+    prompt_item["models"] = [
+        {"title": model.title, "slug": model.slug, "version": model.version}
+        for model in models if model
+    ]
     if cur_user.username:
         prompt_item["user_slug"] = cur_user.username
     add_dynamodb_put_transact(transacts, (f"PROMPT#{prompt_id}", "META"), prompt_item, new_pk_only=True)
@@ -412,9 +420,12 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
     if not changes:
         return
 
-    if "model_slug" in changes or "model_version" in changes:
-        model = get_prompt_model(changes.pop("model_slug", prompt.model.slug if prompt.model else None), changes.pop("model_version", prompt.model.version if prompt.model else None))
-        changes["model"] = {"title": model.title, "slug": model.slug, "version": model.version} if model else None
+    if "models" in changes:
+        changes["models"] = [
+            {"title": model.title, "slug": model.slug, "version": model.version}
+            for model_slug in changes["models"]
+            if (model := get_prompt_model(model_slug))
+        ]
 
     if "tags" in changes:
         changes["tags"] = sanitize_tags(changes["tags"])
@@ -493,10 +504,13 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
     for k, v in changes.items():
         if k == "prompt_slug":
             k = "slug"
-        if k != "model" and hasattr(prompt, k):
+        if k != "models" and hasattr(prompt, k):
             setattr(prompt, k, v)
-    if "model" in changes:
-        prompt.model = get_prompt_model(changes["model"]["slug"], changes["model"]["version"]) if changes["model"] else None
+    if "models" in changes:
+        prompt.models = [
+            model for model_data_item in changes["models"]
+            if (model := get_prompt_model(model_data_item["slug"], model_data_item["version"]))
+        ]
 
 
 def create_prompt_comment(prompt: Prompt, prompt_comment_dto: PromptCommentDTO, cur_user: User,

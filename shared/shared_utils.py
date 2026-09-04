@@ -31,7 +31,7 @@ from basic_dtos import UserTokenDTO
 from query_dtos import (BaseQueryDTO, PromptCommentQueryDTO, PromptQueryDTO, PromptQueryType, PromptStatus,
                         TagQueryDTO, TagQueryType, UserQueryDTO, UserQueryType, UserStatus)
 from user_dtos import UserImpressionAction
-from prompt_models import PROMPT_MODELS, PromptModel, get_prompt_model
+from prompt_models import PROMPT_CATEGORIES, PROMPT_MODELS, PROMPT_OUTPUTS, PromptModel, get_prompt_model
 
 
 def Key(*args, **kwargs):
@@ -229,6 +229,9 @@ class Prompt:
     id: str
     owner_id: str
     title: str
+    description: str
+    category: str
+    outputs: list[str]
     slug: str
     user_id: str
     user_slug: str | None
@@ -244,9 +247,9 @@ class Prompt:
             })
         return None
 
-    content: str
+    template: str
     image_filenames: list[str]
-    model: PromptModel | None
+    models: list[PromptModel]
     tags: list[str]
     status: PromptStatus
     comment: str | None
@@ -295,7 +298,7 @@ class PromptComment:
         return prompt_from_dynamodb({
             "id": self.prompt_id,
             "user_id": self.user_id,
-            "content": "",
+        "template": "",
             "title": self.prompt_title,
             "prompt_slug": self.prompt_slug,
             "status": PromptStatus.PUBLISHED,
@@ -1072,6 +1075,8 @@ def get_jinja2_env():
         "check_auth": check_authorization,
         "PromptStatus": PromptStatus,
         "PROMPT_MODELS": PROMPT_MODELS,
+        "PROMPT_CATEGORIES": PROMPT_CATEGORIES,
+        "PROMPT_OUTPUTS": PROMPT_OUTPUTS,
         "PromptImpressionAction": PromptImpressionAction,
         "UserImpressionAction": UserImpressionAction,
         "PromptQueryType": PromptQueryType,
@@ -1352,22 +1357,30 @@ def get_user_token_by_auth_jwt_token(token: str | None) -> UserTokenDTO | None:
 
 def prompt_from_dynamodb(d_item: dict[str, Any]) -> Prompt:
     owner_id = d_item["user_id"]
-    content = d_item.get("content", "")
-    if isinstance(content, list):
-        content = "\n\n---\n\n".join(content)
-    model_data = d_item.get("model") or {}
-    model = get_prompt_model(model_data.get("slug"), model_data.get("version")) if model_data else None
+    template = d_item.get("template", d_item.get("content", ""))
+    if isinstance(template, list):
+        template = "\n\n---\n\n".join(template)
+    model_data = d_item.get("models")
+    if model_data is None and d_item.get("model"):
+        model_data = [d_item["model"]]
+    models = [
+        model for model_data_item in (model_data or [])
+        if (model := get_prompt_model(model_data_item.get("slug"), model_data_item.get("version")))
+    ]
     return Prompt(
         id=d_item["id"],
         owner_id=owner_id,
         title=d_item["title"],
+        description=d_item.get("description", d_item.get("short_description", "")),
+        category=d_item.get("category", "Other"),
+        outputs=d_item.get("outputs", ["text"]),
         slug=d_item["prompt_slug"],
         user_id=owner_id,
         user_slug=d_item.get("user_slug"),
         user_name=d_item.get("user_name"),
-        content=content,
+        template=template,
         image_filenames=d_item.get("image_filenames", []),
-        model=model,
+        models=models,
         tags=d_item.get("tags", []),
         status=d_item["status"],
         comment=d_item.get("comment"),

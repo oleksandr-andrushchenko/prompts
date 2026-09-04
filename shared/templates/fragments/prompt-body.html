@@ -6,7 +6,7 @@
 
         {% if preview %}
             <div class="text-secondary two-line-ellipsis">
-                {{ prompt.content | truncate(180, True, "...") }}
+                {{ (prompt.description or prompt.template) | truncate(180, True, "...") }}
             </div>
         {% endif %}
     </a>
