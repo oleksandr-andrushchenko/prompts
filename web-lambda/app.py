@@ -386,21 +386,11 @@ async def _user_page(user: UserDep, prompts_query_dto: PromptQueryDep, cur_user:
     activities_year = request.query_params.get("activities_year")
     activities_year = int(activities_year) if activities_year else None
 
-    async def get_activities():
-        if user.published_prompts_count == 0 and user.prompt_comments_count == 0:
-            return []
-        return await to_thread(get_user_activities, user, activities_year)
-
-    async def get_interests():
-        if user.tag_subscriptions_count == 0:
-            return []
-        return await to_thread(get_user_tag_subscriptions, user)
-
     prompts, user_impression, activities, tag_subscriptions = await asyncio.gather(
         to_thread(get_latest_prompts_by_user, user, prompts_query_dto, cur_user),
         to_thread(find_user_impression, user, cur_user) if cur_user else asyncio.sleep(0, result=None),
-        get_activities(),
-        get_interests(),
+        to_thread(get_user_activities, user, activities_year),
+        to_thread(get_user_tag_subscriptions, user),
     )
 
     html_content = get_html_content("user.html", {
