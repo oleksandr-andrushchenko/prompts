@@ -1,91 +1,92 @@
-<form class="row" id="prompt-form" novalidate>
-    <div class="col col-12 col-lg-6 col-xl-8">
-        <label class="w-100">
-            <textarea class="form-control h1 border-0" id="title" name="title" placeholder="Title"
-                      required maxlength="140" rows="1" autofocus>{{ prompt.title if prompt else "" }}</textarea>
+<form id="prompt-form" novalidate>
+    <fieldset class="mb-4">
+        <label class="form-group w-100">
+        <textarea class="form-control h1" id="title" name="title" placeholder="Title" rows="1"
+                  autofocus>{{ prompt.title if prompt else "" }}</textarea>
         </label>
-    </div>
 
-    <div class="col col-12 col-lg-6 col-xl-8 d-flex flex-column gap-2">
-        <label class="w-100">
-            <textarea class="form-control" id="description" name="description"
-                      placeholder="Description" required maxlength="400">{{ prompt.description if prompt else "" }}</textarea>
+        <label class="form-group w-100">
+        <textarea class="form-control" id="description" name="description"
+                  placeholder="Description">{{ prompt.description if prompt else "" }}</textarea>
         </label>
-        <label class="w-100">
-            <textarea class="form-control editor" id="template" name="template" placeholder="Prompt template (use double-brace parameters)" rows="8"
-                      required minlength="1" maxlength="100000">{{ prompt.template if prompt else "" }}</textarea>
+
+        <label class="form-group w-100">
+        <textarea class="form-control editor" id="template" name="template"
+                  placeholder="Prompt template (use double-brace parameters)"
+                  rows="8">{{ prompt.template if prompt else "" }}</textarea>
         </label>
-        <div class="w-100">
-            <div class="result-images-widget" id="result-images-widget">
-                <label class="form-label text-secondary mb-1" for="image_files">Cover images (up to 8):</label>
-                <input type="hidden" id="image_filenames" name="image_filenames"
-                       value="{{ prompt.image_filenames|join(", ") if prompt else "" }}">
-                <input class="form-control" type="file" id="image_files" accept="image/jpeg,image/png,image/gif" multiple data-form-ignore>
-                <div class="input-group mt-2">
-                    <input class="form-control" type="url" id="image_url" placeholder="Paste an image URL">
-                    <button class="btn btn-outline-secondary" type="button" id="add-image-url">Add URL</button>
-                </div>
-                <div class="form-text">Choose multiple files or add images by URL. Dragging files here also works.</div>
-                <div class="row row-cols-2 row-cols-md-3 g-2 mt-1" id="result-image-previews" aria-live="polite"></div>
-            </div>
+    </fieldset>
+
+    <div class="form-group mb-4" id="result-images-widget">
+        <label class="form-label text-secondary mb-1" for="image_files">Screenshots (up to 8):</label>
+        <input type="hidden" id="image_filenames" name="image_filenames"
+               value="{{ prompt.image_filenames|join(", ") if prompt else "" }}">
+        <input class="form-control" type="file" id="image_files" accept="image/jpeg,image/png,image/gif" multiple
+               data-form-ignore>
+        <div class="input-group mt-2">
+            <input class="form-control" type="url" id="image_url" placeholder="Paste an image URL">
+            <button class="btn btn-outline-secondary" type="button" id="add-image-url">Add URL</button>
         </div>
+        <div class="form-text">Choose multiple files or add images by URL. Dragging files here also works.</div>
+        <div class="row row-cols-2 row-cols-md-3 g-2 mt-1" id="result-image-previews" aria-live="polite"></div>
     </div>
 
-    <div class="col col-12 col-lg-6 col-xl-4 d-flex flex-column gap-2">
-        <fieldset>
-            <legend class="col-form-label text-secondary">Category:</legend>
-            <div class="row row-cols-1 row-cols-sm-2 g-2">
-                {% for category in PROMPT_CATEGORIES %}
-                    <div class="col">
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="category" id="category-{{ loop.index }}"
-                                   value="{{ category.value }}" required
-                                   {% if prompt and prompt.category == category.value %}checked{% endif %}>
-                            <label class="form-check-label" for="category-{{ loop.index }}">{{ category.value }}</label>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        </fieldset>
-        <fieldset>
-            <legend class="col-form-label text-secondary">Output:</legend>
-            <div class="d-flex flex-wrap gap-3">
-                {% for output in PROMPT_OUTPUTS %}
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="outputs" id="output-{{ loop.index }}"
-                               value="{{ output.value }}" {% if prompt and output.value in prompt.outputs %}checked{% endif %}>
-                        <label class="form-check-label" for="output-{{ loop.index }}">{{ output.value|capitalize }}</label>
-                    </div>
-                {% endfor %}
-            </div>
-            <div class="form-text">Choose one or more output types.</div>
-        </fieldset>
-        <fieldset>
-            <legend class="col-form-label text-secondary">Recommended models:</legend>
-            <div class="d-flex flex-column gap-2">
-                {% for model in PROMPT_MODELS %}
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="models" id="model-{{ loop.index }}"
-                               value="{{ model.slug }}"
-                               {% if prompt and model.slug in (prompt.models | map(attribute="slug") | list) %}checked{% endif %}>
-                        <label class="form-check-label" for="model-{{ loop.index }}">{{ model.title }} ({{ model.version }})</label>
-                    </div>
-                {% endfor %}
-            </div>
-        </fieldset>
+    <fieldset class="form-group mb-4">
+        <legend class="col-form-label text-secondary">Category:</legend>
+        <div class="d-flex flex-wrap gap-3">
+            {% for category in PROMPT_CATEGORIES %}
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="category" id="category-{{ loop.index }}"
+                           value="{{ category.value }}"
+                           {% if prompt and prompt.category == category.value %}checked{% endif %}>
+                    <label class="form-check-label" for="category-{{ loop.index }}">{{ category.value }}</label>
+                </div>
+            {% endfor %}
+        </div>
+    </fieldset>
 
+    <fieldset class="form-group mb-4">
+        <legend class="col-form-label text-secondary">Output:</legend>
+        <div class="d-flex flex-wrap gap-3">
+            {% for output in PROMPT_OUTPUTS %}
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="outputs" id="output-{{ loop.index }}"
+                           value="{{ output.value }}"
+                           {% if prompt and output.value in prompt.outputs %}checked{% endif %}>
+                    <label class="form-check-label"
+                           for="output-{{ loop.index }}">{{ output.value|capitalize }}</label>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="form-text">Choose one or more output types.</div>
+    </fieldset>
+
+    <fieldset class="form-group mb-4">
+        <legend class="col-form-label text-secondary">Recommended models:</legend>
+        <div class="d-flex flex-wrap gap-3">
+            {% for model in PROMPT_MODELS %}
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="models" id="model-{{ loop.index }}"
+                           value="{{ model.slug }}"
+                           {% if prompt and model.slug in (prompt.models | map(attribute="slug") | list) %}checked{% endif %}>
+                    <label class="form-check-label" for="model-{{ loop.index }}">{{ model.title }}
+                        ({{ model.version }})</label>
+                </div>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <div class="form-group mb-4 ">
         <small class="text-secondary bi bi-tags"> Tags:</small>
         {% with url=url("get-tags", absolute=True), value=prompt.tags if prompt else [] %}
             {% include "fragments/tags-input.html" %}
         {% endwith %}
-
-        <div>
-            <button type="submit" class="btn btn-light">
-                <i class="bi {% if prompt %}bi-arrow-clockwise{% else %}bi-plus-lg{% endif %}"></i>
-                {% if prompt %}Update{% else %}Create{% endif %} prompt
-            </button>
-        </div>
     </div>
+
+    <button type="submit" class="btn btn-light">
+        <i class="bi {% if prompt %}bi-arrow-clockwise{% else %}bi-plus-lg{% endif %}"></i>
+        {% if prompt %}Update{% else %}Create{% endif %} prompt
+    </button>
 </form>
 
 <script>
@@ -102,15 +103,22 @@
           {rule: "maxLength", value: 400}
         ],
         category: [
-          {rule: "required"}
+          {
+            validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="category"]:checked').length > 0,
+            errorMessage: "Select a category"
+          }
         ],
         outputs: [
-          {validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="outputs"]:checked').length > 0,
-           errorMessage: "Select at least one output type"}
+          {
+            validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="outputs"]:checked').length > 0,
+            errorMessage: "Select at least one output type"
+          }
         ],
         models: [
-          {validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="models"]:checked').length > 0,
-           errorMessage: "Select at least one recommended model"}
+          {
+            validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="models"]:checked').length > 0,
+            errorMessage: "Select at least one recommended model"
+          }
         ],
         template: [
           {rule: "required"},
@@ -156,7 +164,10 @@
         col.className = "col"
         col.innerHTML = `<div class="position-relative border rounded p-1 h-100"><img class="w-100 rounded object-fit-cover" style="height: 120px" alt="Result image ${index + 1}"><button type="button" class="btn btn-sm btn-dark position-absolute top-0 end-0 m-1" aria-label="Remove image"><i class="bi bi-x"></i></button></div>`
         col.querySelector("img").src = item.upload ? item.preview : imageSrc(item.preview)
-        col.querySelector("button").addEventListener("click", () => { items.splice(index, 1); render() })
+        col.querySelector("button").addEventListener("click", () => {
+          items.splice(index, 1);
+          render()
+        })
         preview.append(col)
       })
       hidden.value = items.filter(item => !item.upload).map(item => item.value).join(", ")
@@ -166,14 +177,28 @@
       files.push(file)
       items.push({upload: true, file, preview: URL.createObjectURL(file)})
     })
-    fileInput.addEventListener("change", () => { addFiles([...fileInput.files]); fileInput.value = ""; render() })
-    widget.addEventListener("dragover", event => { event.preventDefault(); widget.classList.add("border", "border-primary") })
+    fileInput.addEventListener("change", () => {
+      addFiles([...fileInput.files]);
+      fileInput.value = "";
+      render()
+    })
+    widget.addEventListener("dragover", event => {
+      event.preventDefault();
+      widget.classList.add("border", "border-primary")
+    })
     widget.addEventListener("dragleave", () => widget.classList.remove("border", "border-primary"))
-    widget.addEventListener("drop", event => { event.preventDefault(); widget.classList.remove("border", "border-primary"); addFiles([...event.dataTransfer.files]); render() })
+    widget.addEventListener("drop", event => {
+      event.preventDefault();
+      widget.classList.remove("border", "border-primary");
+      addFiles([...event.dataTransfer.files]);
+      render()
+    })
     document.getElementById("add-image-url").addEventListener("click", () => {
       const value = urlInput.value.trim()
       if (!value || !/^https?:\/\//i.test(value) || items.some(item => item.value === value)) return
-      items.push({value, preview: value}); urlInput.value = ""; render()
+      items.push({value, preview: value});
+      urlInput.value = "";
+      render()
     })
     render()
   })
