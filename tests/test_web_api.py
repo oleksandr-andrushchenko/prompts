@@ -476,7 +476,7 @@ def test_regular_user_can_create_prompt_comment():
         "title": "Regular comment permission test prompt",
         "prompt_slug": "regular-comment-permission-test-prompt",
         "user_id": owner_id,
-        "content": "Long form prompt content for integration testing. " * 120,
+        "template": "Long form prompt template for integration testing. " * 120,
         "tags": ["testing"],
         "rating_sk": now,
         "status": "published",
@@ -509,7 +509,7 @@ def test_index_shows_latest_prompt_comments(guest_client):
         "title": prompt_title,
         "prompt_slug": "latest-comments-test-prompt",
         "user_id": user_id,
-        "content": "Long form prompt content for integration testing. " * 120,
+        "template": "Long form prompt template for integration testing. " * 120,
         "tags": ["testing"],
         "rating_sk": now,
         "status": "published",
@@ -789,7 +789,7 @@ def test_user_status_endpoint_success_and_validation_failure(root_user_client):
 
 PROMPT_IMAGE_FILENAME = "9ba8f5cf-b0a4-430c-99ec-4a78f3c4245f_1080x784.png"
 PROMPT_IMAGE_ALT = "Functional prompt image"
-PROMPT_CONTENT = ("Functional endpoint coverage content. " * 140
+PROMPT_TEMPLATE = ("Functional endpoint coverage template. " * 140
                    + f'<p><img src="/{PROMPT_IMAGE_FILENAME}" alt="{PROMPT_IMAGE_ALT}"></p>')
 
 
@@ -803,7 +803,11 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
 
     create_success = prompt(root_client, "/prompts", json={
         "title": "Functional endpoint coverage prompt",
-        "content": PROMPT_CONTENT,
+        "description": "A functional endpoint coverage prompt.",
+        "category": "Code & Dev",
+        "outputs": ["text"],
+        "template": PROMPT_TEMPLATE,
+        "models": ["openai-gpt-4o"],
         "tags": ["functional-tag", "coverage-tag"],
         "image_filenames": [PROMPT_IMAGE_FILENAME],
     })
@@ -814,12 +818,16 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     )
     functional_state["prompt_id"] = prompt_item["id"]
     functional_state["prompt_slug"] = prompt_item["prompt_slug"]
-    assert prompt_item["content"] == PROMPT_CONTENT
+    assert prompt_item["template"] == PROMPT_TEMPLATE
     assert prompt_item["image_filenames"] == [PROMPT_IMAGE_FILENAME]
 
     create_failure = prompt(root_client, "/prompts", json={
-        "title": "short",
-        "content": PROMPT_CONTENT,
+        "title": "Invalid prompt payload",
+        "description": "A functional endpoint coverage prompt.",
+        "category": "Code & Dev",
+        "outputs": ["text"],
+        "template": "",
+        "models": ["openai-gpt-4o"],
         "tags": ["functional-tag"],
     })
     assert create_failure.status_code == 422
@@ -857,7 +865,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert prompt_schema["image"][0].endswith(f"/{PROMPT_IMAGE_FILENAME}")
     assert prompt_schema["thumbnailUrl"].endswith(f"/{PROMPT_IMAGE_FILENAME}")
     assert read_doc('meta[name="robots"]').attr("content") == "index, follow"
-    rendered_picture = read_doc("prompt picture")
+    rendered_picture = read_doc("article picture")
     assert len(rendered_picture) == 1
     rendered_source = rendered_picture("source")
     assert len(rendered_source) == 1
@@ -866,8 +874,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert f"{PROMPT_IMAGE_FILENAME.rsplit('_', 1)[0]}_640x" in rendered_source.attr("srcset")
     assert f"{PROMPT_IMAGE_FILENAME.rsplit('_', 1)[0]}_1024x" in rendered_source.attr("srcset")
     rendered_img = rendered_picture("img")
-    assert rendered_img.attr("alt") == "Functional endpoint coverage prompt"
-    assert "<figure" in read_success.text
+    assert rendered_img.attr("alt") == "Functional endpoint coverage prompt output 1"
 
     dynamodb_table.update_item(
         Key={"pk": f"PROMPT#{prompt_id}", "sk": "META"},
@@ -898,14 +905,14 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
 
     update_success = patch(root_client, f"/prompts/{prompt_id}", json={
         "title": "Updated functional endpoint coverage prompt",
-        "content": PROMPT_CONTENT,
+        "template": PROMPT_TEMPLATE,
         "tags": ["functional-tag", "coverage-tag"],
     })
     assert update_success.status_code == 200, update_success.text
     functional_state["prompt_slug"] = "updated-functional-endpoint-coverage-prompt"
     update_failure = patch(root_client, f"/prompts/{prompt_id}", json={
-        "title": "bad",
-        "content": PROMPT_CONTENT,
+        "category": "Invalid category",
+        "template": PROMPT_TEMPLATE,
         "tags": ["functional-tag"],
     })
     assert update_failure.status_code == 422
@@ -944,7 +951,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     rename_tag_success = patch(root_client, "/tags/coverage-tag", json={
         "name": "Coverage Tag Updated",
         "image_action": "keep",
-        "image_file": None,
+        "image_filename": None,
     })
     assert rename_tag_success.status_code == 200, rename_tag_success.text
     renamed_old_tag_page = get(
@@ -1014,7 +1021,7 @@ def test_prompt_impression_comment_and_comment_update_endpoints_success_and_fail
     assert len(comments_schema["comment"]) == 1
     assert comments_schema["comment"][0]["text"] == "Updated functional endpoint comment"
     comment_id_fragment = comments_schema["comment"][0]["@id"].rsplit("#", 1)[-1]
-    assert comments_doc(f"prompt#{comment_id_fragment}")
+    assert comments_doc(f"article#{comment_id_fragment}")
     assert comments_doc(f'time[datetime="{comments_schema["comment"][0]["datePublished"]}"]')
 
     comments_fragment = get(regular_client, f"/prompts/{prompt_id}/comments-fragment?limit=1")
@@ -1070,7 +1077,7 @@ def test_tag_edit_and_update_endpoints_success_and_failure():
     update_success = patch(root_client, "/tags/functional-tag", json={
         "name": "Functional Tag Updated",
         "image_action": "keep",
-        "image_file": None,
+        "image_filename": None,
     })
     assert update_success.status_code == 200, update_success.text
     update_failure = patch(root_client, "/tags/functional-tag-updated", json={
@@ -1156,7 +1163,11 @@ def test_prompt_published_dispatch_matches_combinations_excludes_author_and_rend
 
     create_response = prompt(author_client, "/prompts", json={
         "title": "Combination notification integration prompt",
-        "content": PROMPT_CONTENT,
+        "description": "A combination notification integration prompt.",
+        "category": "Code & Dev",
+        "outputs": ["text"],
+        "template": PROMPT_TEMPLATE,
+        "models": ["openai-gpt-4o"],
         "tags": ["notification-tag1", "notification-tag2", "notification-tag3"],
     })
     assert create_response.status_code == 200, create_response.text

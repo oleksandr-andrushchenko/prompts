@@ -1357,7 +1357,7 @@ def get_user_token_by_auth_jwt_token(token: str | None) -> UserTokenDTO | None:
 
 def prompt_from_dynamodb(d_item: dict[str, Any]) -> Prompt:
     owner_id = d_item["user_id"]
-    template = d_item.get("template", d_item.get("content", ""))
+    template = d_item.get("template", "")
     if isinstance(template, list):
         template = "\n\n---\n\n".join(template)
     model_data = d_item.get("models")
