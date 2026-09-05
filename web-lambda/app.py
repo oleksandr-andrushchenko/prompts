@@ -57,7 +57,6 @@ from web_utils import (
     get_static_files_dir,
     UserStatus,
     UserBannedError,
-    utc_now,
     get_allowed_origins,
     get_redirect_url,
     should_show_popular_prompts,
@@ -484,7 +483,6 @@ async def logout_callback(request: Request):
 async def policy(cur_user: OptCurUserDep) -> str:
     return get_html_content("policy.html", {
         "cur_user": cur_user,
-        "utc_now": utc_now(),
     })
 
 
@@ -492,7 +490,6 @@ async def policy(cur_user: OptCurUserDep) -> str:
 async def rules(cur_user: OptCurUserDep) -> str:
     return get_html_content("rules.html", {
         "cur_user": cur_user,
-        "utc_now": utc_now(),
     })
 
 
@@ -500,7 +497,6 @@ async def rules(cur_user: OptCurUserDep) -> str:
 async def terms(cur_user: OptCurUserDep) -> str:
     return get_html_content("terms.html", {
         "cur_user": cur_user,
-        "utc_now": utc_now(),
     })
 
 
