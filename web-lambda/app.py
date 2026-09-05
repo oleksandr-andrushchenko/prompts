@@ -203,7 +203,7 @@ async def index(cur_user: OptCurUserDep) -> str:
         to_thread(get_latest_published_prompts, limit=latest_prompts_query.limit),
         to_thread(get_popular_published_prompts, limit=8),
         to_thread(get_latest_prompt_comments, latest_prompt_comments_query),
-        to_thread(get_popular_active_users, limit=5 if should_show_become_an_author else 4),
+        to_thread(get_popular_active_users, limit=11 if should_show_become_an_author else 10),
     )
     return get_html_content("index.html", {
         "cur_user": cur_user,
