@@ -32,7 +32,7 @@
                 </div>
 
                 <div class="{{ {"def": 6, "lg": 8, "xl": 10} | col_classes }}" id="upload-avatar" style="display:none">
-                    <input type="file" class="form-control" id="avatar_file" name="avatar_file"
+                    <input type="file" class="form-control" id="image_file" name="image_file"
                            placeholder="Avatar" data-public-file>
                 </div>
             </div>
@@ -186,7 +186,7 @@
     handleFormSubmit("#user-form", {{ (url('update-user', user_id=user.id, absolute=True) if user else '') | tojson }}, {
       method: "{{ 'PATCH' if user else 'POST' }}",
       rules: {
-        avatar_file: [
+        image_file: [
           {
             rule: "required",
             errorMessage: "Avatar is required"
