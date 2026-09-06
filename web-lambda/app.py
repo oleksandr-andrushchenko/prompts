@@ -10,7 +10,6 @@ from shared_deps import (
     PromptDep,
     UserQueryDep,
     UserDep,
-    get_error_response,
     UserBySlugDep,
     PromptBySlugsDep,
     PromptQueryBySlugsDep,
@@ -24,6 +23,7 @@ from shared_utils import get_tags
 from web import Application, Request, HTTPException, HTMLResponse, JSONResponse, RedirectResponse, \
     RequestValidationError, CORSMiddleware, FileResponse
 from web_utils import (
+    get_error_response,
     to_thread,
     PromptQueryDTO,
     PromptCommentQueryDTO,

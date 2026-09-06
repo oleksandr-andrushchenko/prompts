@@ -1,3 +1,7 @@
+from http import HTTPStatus
+
+from web import JSONResponse, Request
+
 from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
     UpdatePromptStatusDTO, UpdateTagDTO,
@@ -12,6 +16,17 @@ from user_dtos import (
     UserImpressionAction,
 )
 from prompt_models import get_prompt_model
+
+
+def get_error_response(request: Request, status_code: int, details: dict | str = None):
+    """Return JSON for API errors, including requests with no matched route."""
+    status = HTTPStatus(status_code)
+    return JSONResponse(status_code=status_code, content={
+        "code": status_code,
+        "title": status.phrase,
+        "message": status.description,
+        "details": details,
+    })
 
 
 def drop_cdn_cache(user: User) -> tuple[bool, int]:

@@ -15,7 +15,6 @@ from deps import (
     UpdateUserDTODep,
     UpdateUserActivitySettingsDTODep,
     UpdateUserInterestsSettingsDTODep,
-    get_error_response,
     UpdatePromptDTODep,
     UpdatePromptStatusDTODep,
     UpdatePromptImpressionDTODep,
@@ -28,6 +27,7 @@ from deps import (
     TagSubscriptionDTODep,
 )
 from api_utils import (
+    get_error_response,
     to_thread,
     ContactMessageDTO,
     PromptDTO,
