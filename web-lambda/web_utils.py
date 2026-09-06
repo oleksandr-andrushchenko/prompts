@@ -40,7 +40,7 @@ def get_user_token_by_code(code: str, callback_url: str) -> UserTokenDTO:
 
         import httpx
         with httpx.Client() as client:
-            token_resp = client.prompt(token_url, data=data, headers=headers)
+            token_resp = client.post(token_url, data=data, headers=headers)
             if token_resp.status_code != 200:
                 logger.error(f"Token exchange failed: {token_resp.status_code} {token_resp.text}")
                 raise CodeExchangeFailedError("Failed to exchange code")
