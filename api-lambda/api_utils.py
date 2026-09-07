@@ -1,6 +1,6 @@
 from http import HTTPStatus
 
-from web import JSONResponse, Request
+from web import JSONResponse
 
 from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
@@ -9,7 +9,7 @@ from prompt_dtos import (
 from tag_subscription_dtos import TagSubscriptionDTO
 from basic_dtos import ContactMessageDTO, FileDTO, ImageFileDTO
 from shared_utils import *
-from shared_utils import get_tags
+from shared_utils import get_tags, logger
 from user_dtos import (
     UpdateUserDTO, UpdateUserImpressionDTO, UpdateUserStatusDTO,
     UpdateUserActivitySettingsDTO, UpdateUserInterestsSettingsDTO,
@@ -18,7 +18,7 @@ from user_dtos import (
 from prompt_models import get_prompt_model
 
 
-def get_error_response(request: Request, status_code: int, details: dict | str = None):
+def get_error_response(status_code: int, details: dict | str = None):
     """Return JSON for API errors, including requests with no matched route."""
     status = HTTPStatus(status_code)
     return JSONResponse(status_code=status_code, content={
@@ -422,6 +422,7 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
             raise SlugDuplicationError(field="title")
         raise
 
+    logger.info("New prompt created", extra={"prompt_id": prompt_id})
     return prompt_from_dynamodb(prompt_item)
 
 
@@ -577,6 +578,7 @@ def create_prompt_comment(prompt: Prompt, prompt_comment_dto: PromptCommentDTO, 
             raise SlugDuplicationError(field="title")
         raise
 
+    logger.info("New comment added", extra={"prompt_id": prompt.id, "comment_id": comment_id})
     return prompt_comment_from_dynamodb(prompt_comment_item)
 
 
@@ -818,6 +820,7 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
 
     dynamodb_transact_write(transacts)
 
+    logger.info("Prompt status changed", extra={"prompt_id": prompt.id, "status": status})
     if status == PromptStatus.PUBLISHED:
         try:
             dispatch_prompt_published_event(prompt)
@@ -862,6 +865,7 @@ def create_contact_message(message_dto: ContactMessageDTO, user: User = None) ->
         message_item["user_id"] = user.id
 
     get_dynamodb_table().put_item(Item=message_item)
+    logger.info("New contact message", extra={"message_id": message_id})
 
     return ContactMessage(
         id=message_id,

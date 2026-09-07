@@ -3,7 +3,7 @@ from urllib.parse import quote, urlparse
 
 from shared_utils import *
 from shared_utils import get_html_content
-from web import HTMLResponse, JSONResponse, Request
+from web import HTMLResponse
 
 
 def get_login_redirect_url(callback_url: str) -> str:
@@ -253,38 +253,13 @@ def get_popular_active_users(limit: int = BaseQueryDTO.DEFAULT_LIMIT) -> list[Us
     return get_popular_users(query_dto)
 
 
-def get_error_response(request: Request, status_code: int, details: dict | str = None):
-    from api_route_metadata import API_URL_ROUTES
+def get_error_response(status_code: int, details: dict | str = None):
     from http import HTTPStatus
-    status_enum = HTTPStatus(status_code)
-    public_data = {
-        "code": status_code,
-        "title": status_enum.phrase,
-        "message": status_enum.description,
-        "details": details,
-    }
-
-    content_type = request.headers.get("content-type", "")
-    is_api_request = request.scope.get("route_name") in API_URL_ROUTES
-    if is_api_request or "application/json" in content_type:
-        return JSONResponse(
-            status_code=status_code,
-            content=public_data
-        )
-
-    # cur_user = None
-    # if status_code != 401:
-    #     try:
-    #         cur_user =  get_cur_user(request)
-    #     except HTTPException:
-    #         pass
-
+    status = HTTPStatus(status_code)
     content = get_html_content("error.html", {
-        **public_data,
-        # "cur_user": cur_user
+        "code": status_code,
+        "title": status.phrase,
+        "message": status.description,
+        "details": details,
     })
-
-    return HTMLResponse(
-        status_code=status_code,
-        content=content
-    )
+    return HTMLResponse(status_code=status_code, content=content)
