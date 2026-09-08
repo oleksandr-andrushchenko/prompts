@@ -3,6 +3,7 @@
 API_URL_ROUTES = {
     "upload-public-file": "/public-file",
     "create-prompt": "/prompts",
+    "prompt-hrefs": "/prompts/hrefs",
     "prompts-fragment": "/prompts-fragment",
     "prompt-comments-fragment": "/prompts/{prompt_id}/comments-fragment",
     "update-prompt": "/prompts/{prompt_id}",

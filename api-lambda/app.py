@@ -53,6 +53,7 @@ from api_utils import (
     get_users,
     get_latest_prompts_by_user,
     get_prompts,
+    get_prompt_hrefs,
     find_user,
     jinja2_env,
     update_user,
@@ -245,6 +246,11 @@ async def prompts_fragment(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -
     return get_html_content("fragments/prompts.html", {
         "prompts": get_prompts(query_dto, cur_user)
     })
+
+
+@route("get", "prompt-hrefs", response_class=JSONResponse)
+async def _prompt_hrefs(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> dict[str, list[str]]:
+    return await asyncio.to_thread(get_prompt_hrefs, query_dto, cur_user)
 
 
 @route("get", "prompt-comments-fragment", response_class=HTMLResponse)

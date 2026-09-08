@@ -1,3 +1,5 @@
+from dataclasses import replace
+from html.parser import HTMLParser
 from http import HTTPStatus
 
 from web import JSONResponse
@@ -9,7 +11,8 @@ from prompt_dtos import (
 from tag_subscription_dtos import TagSubscriptionDTO
 from basic_dtos import ContactMessageDTO, FileDTO, ImageFileDTO
 from shared_utils import *
-from shared_utils import get_tags, logger
+from shared_utils import User, get_prompts, get_tags, logger
+from query_dtos import PromptQueryDTO
 from user_dtos import (
     UpdateUserDTO, UpdateUserImpressionDTO, UpdateUserStatusDTO,
     UpdateUserActivitySettingsDTO, UpdateUserInterestsSettingsDTO,
@@ -27,6 +30,37 @@ def get_error_response(status_code: int, details: dict | str = None):
         "message": status.description,
         "details": details,
     })
+
+
+class PromptHrefExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.hrefs: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        for name, value in attrs:
+            if name == "href" and value is not None:
+                self.hrefs.append(value)
+
+
+def get_prompt_hrefs(query_dto: PromptQueryDTO, cur_user: User | None = None) -> dict[str, list[str]]:
+    """Collect template hrefs across all pages matching the prompt query."""
+    # Traverse the status index so tag filtering cannot discard a page cursor.
+    query = replace(query_dto, tags=[])
+    wanted_tags = set(query_dto.tags)
+    result = {}
+    while prompts := get_prompts(query, cur_user):
+        for prompt in prompts:
+            if not wanted_tags.issubset(prompt.tags):
+                continue
+            parser = PromptHrefExtractor()
+            parser.feed(prompt.template)
+            parser.close()
+            result[prompt.id] = parser.hrefs
+        query = replace(query, offset=prompts[-1].offset)
+        if not query.offset:
+            break
+    return result
 
 
 def drop_cdn_cache(user: User) -> tuple[bool, int]:
