@@ -2,6 +2,7 @@
 
 WEB_URL_ROUTES = {
     "index": "/",
+    "static-file": "/{filename:path}",
     "new-prompt": "/prompts/new",
     "prompts": "/prompts",
     "tags": "/tags",
@@ -32,6 +33,8 @@ WEB_URL_ROUTES = {
     "terms": "/terms-of-service",
     "earn": "/earn-with-us",
     "utils": "/utils",
-    "user-by-slug": "/{slug}",
-    "prompt-by-slugs": "/{user_slug}/{prompt_slug}",
+    "user-by-slug": "/@{slug}",
+    "prompt-by-slugs": "/@{user_slug}/{prompt_slug}",
+    "legacy-user-by-slug": "/{slug}",
+    "legacy-prompt-by-slugs": "/{user_slug}/{prompt_slug}",
 }

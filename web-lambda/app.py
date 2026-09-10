@@ -78,6 +78,9 @@ from api_route_metadata import API_URL_ROUTES
 from web_route_metadata import WEB_URL_ROUTES
 
 
+app.add_url_route(WEB_URL_ROUTES["static-file"], "static-file")
+
+
 def route(method, name, **kwargs):
     return getattr(app, method)(WEB_URL_ROUTES[name], name=name, **kwargs)
 
@@ -331,6 +334,17 @@ async def edit_prompt(prompt: PromptDep, cur_user: CurUserDep) -> str:
     })
 
 
+@route("get", "user-by-slug", response_class=HTMLResponse)
+async def user_page_by_slug(user: UserBySlugDep, prompts_query_dto: PromptQueryDep,
+                            cur_user: OptCurUserDep, request: Request) -> HTMLResponse:
+    return await _user_page(user, prompts_query_dto, cur_user, request)
+
+
+@route("get", "prompt-by-slugs", response_class=HTMLResponse)
+async def prompt_page_by_slugs(prompt: PromptBySlugsDep, cur_user: OptCurUserDep) -> HTMLResponse:
+    return await _prompt_page(prompt, cur_user)
+
+
 @route("get", "prompts-by-slugs", response_class=HTMLResponse)
 async def prompts_page_by_slugs(query_dto: PromptQueryBySlugsDep, cur_user: OptCurUserDep) -> HTMLResponse:
     return await _prompts_page(query_dto, cur_user)
@@ -527,12 +541,17 @@ async def utils(cur_user: CurUserDep) -> str:
     })
 
 
-@route("get", "user-by-slug", response_class=HTMLResponse)
-async def user_page_by_slug(user: UserBySlugDep, prompts_query_dto: PromptQueryDep,
-                            cur_user: OptCurUserDep, request: Request) -> HTMLResponse:
-    return await _user_page(user, prompts_query_dto, cur_user, request)
+@route("get", "legacy-user-by-slug", response_class=RedirectResponse)
+async def legacy_user_by_slug(request: Request, slug: str) -> RedirectResponse:
+    url = get_url(request, "user-by-slug", slug=slug)
+    if request.url.query:
+        url += f"?{request.url.query}"
+    return RedirectResponse(url=url, status_code=301)
 
 
-@route("get", "prompt-by-slugs", response_class=HTMLResponse)
-async def prompt_page_by_slugs(prompt: PromptBySlugsDep, cur_user: OptCurUserDep) -> HTMLResponse:
-    return await _prompt_page(prompt, cur_user)
+@route("get", "legacy-prompt-by-slugs", response_class=RedirectResponse)
+async def legacy_prompt_by_slugs(request: Request, user_slug: str, prompt_slug: str) -> RedirectResponse:
+    url = get_url(request, "prompt-by-slugs", user_slug=user_slug, prompt_slug=prompt_slug)
+    if request.url.query:
+        url += f"?{request.url.query}"
+    return RedirectResponse(url=url, status_code=301)
