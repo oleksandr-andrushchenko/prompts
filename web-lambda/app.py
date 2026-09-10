@@ -1,6 +1,7 @@
 import asyncio
 
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import Match
 
 from notifications import get_access_log_message
 from query_dtos import TagQueryDTO
@@ -81,9 +82,14 @@ from web_utils import (
     get_user_activities,
     get_user_tag_subscription_for_tags,
     get_user_tag_subscriptions,
+    get_legacy_user_redirect_url,
+    get_legacy_prompt_redirect_url,
 )
 
+from web import TrailingSlashMiddleware
+
 app = Application()
+app.add_middleware(TrailingSlashMiddleware)
 
 from api_route_metadata import API_URL_ROUTES
 from web_route_metadata import WEB_URL_ROUTES
@@ -134,6 +140,19 @@ async def redirect_legacy_web_endpoints(request: Request, call_next):
         if old in path:
             path = path.replace(old, new, 1)
             url = path + (f"?{request.url.query}" if request.url.query else "")
+            return RedirectResponse(url=url, status_code=308)
+
+    if request.method in {"GET", "HEAD"} and not any(
+            route.matches(request.scope)[0] == Match.FULL for route in app.routes):
+        slugs = [part for part in path.split("/") if part]
+        url = None
+        if len(slugs) == 1:
+            url = get_legacy_user_redirect_url(request, slugs[0])
+        elif len(slugs) == 2:
+            url = get_legacy_prompt_redirect_url(request, slugs[0], slugs[1])
+        if url:
+            if request.url.query:
+                url += f"?{request.url.query}"
             return RedirectResponse(url=url, status_code=308)
     return await call_next(request)
 
@@ -193,13 +212,13 @@ async def not_authorized_error_handler(_request: Request, exc: NotAuthorizedErro
 @app.exception_handler(PromptByOldSlugRequestedError)
 async def prompt_redirect_exception_handler(request: Request, exc: PromptByOldSlugRequestedError):
     url = get_prompt_url(request, exc.prompt)
-    return RedirectResponse(url=url, status_code=301)
+    return RedirectResponse(url=url, status_code=308)
 
 
 @app.exception_handler(UserByOldSlugRequestedError)
 async def prompt_redirect_exception_handler(request: Request, exc: UserByOldSlugRequestedError):
     url = get_user_url(request, exc.user)
-    return RedirectResponse(url=url, status_code=301)
+    return RedirectResponse(url=url, status_code=308)
 
 
 @app.exception_handler(TagByOldSlugRequestedError)
@@ -208,7 +227,7 @@ async def tag_redirect_exception_handler(request: Request, exc: TagByOldSlugRequ
         url = get_url(request, "edit-tag", slug=exc.tag.slug)
     else:
         url = get_tag_url(request, exc.tag)
-    return RedirectResponse(url=url, status_code=301)
+    return RedirectResponse(url=url, status_code=308)
 
 
 @route("get", "index", response_class=HTMLResponse)
@@ -364,7 +383,7 @@ def _legacy_prompts_redirect(request: Request) -> RedirectResponse:
     elif path.endswith("/posts"):
         path = path[:-len("/posts")] + "/prompts"
     url = path + (f"?{request.url.query}" if request.url.query else "")
-    return RedirectResponse(url=url, status_code=301)
+    return RedirectResponse(url=url, status_code=308)
 
 
 @route("get", "legacy-posts")
@@ -544,19 +563,3 @@ async def utils(cur_user: CurUserDep) -> str:
     return get_html_content("utils.html", {
         "cur_user": cur_user,
     })
-
-
-@route("get", "legacy-user-by-slug", response_class=RedirectResponse)
-async def legacy_user_by_slug(request: Request, slug: str) -> RedirectResponse:
-    url = get_url(request, "user-by-slug", slug=slug)
-    if request.url.query:
-        url += f"?{request.url.query}"
-    return RedirectResponse(url=url, status_code=301)
-
-
-@route("get", "legacy-prompt-by-slugs", response_class=RedirectResponse)
-async def legacy_prompt_by_slugs(request: Request, user_slug: str, prompt_slug: str) -> RedirectResponse:
-    url = get_url(request, "prompt-by-slugs", user_slug=user_slug, prompt_slug=prompt_slug)
-    if request.url.query:
-        url += f"?{request.url.query}"
-    return RedirectResponse(url=url, status_code=301)

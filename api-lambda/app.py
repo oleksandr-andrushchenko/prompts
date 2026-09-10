@@ -89,7 +89,10 @@ from shared_utils import (
 from web import Application, Request, HTTPException, HTMLResponse, JSONResponse, RedirectResponse, \
     RequestValidationError, CORSMiddleware
 
+from web import TrailingSlashMiddleware
+
 app = Application()
+app.add_middleware(TrailingSlashMiddleware)
 
 
 @app.get("/robots.txt", name="api-robots")
@@ -200,13 +203,13 @@ async def not_authorized_error_handler(_request: Request, exc: NotAuthorizedErro
 @app.exception_handler(PromptByOldSlugRequestedError)
 async def prompt_redirect_exception_handler(request: Request, exc: PromptByOldSlugRequestedError):
     url = get_prompt_url(request, exc.prompt)
-    return RedirectResponse(url=url, status_code=301)
+    return RedirectResponse(url=url, status_code=308)
 
 
 @app.exception_handler(UserByOldSlugRequestedError)
 async def prompt_redirect_exception_handler(request: Request, exc: UserByOldSlugRequestedError):
     url = get_user_url(request, exc.user)
-    return RedirectResponse(url=url, status_code=301)
+    return RedirectResponse(url=url, status_code=308)
 
 
 @app.exception_handler(TagByOldSlugRequestedError)
@@ -215,7 +218,7 @@ async def tag_redirect_exception_handler(request: Request, exc: TagByOldSlugRequ
         url = get_url(request, "edit-tag", slug=exc.tag.slug)
     else:
         url = get_tag_url(request, exc.tag)
-    return RedirectResponse(url=url, status_code=301)
+    return RedirectResponse(url=url, status_code=308)
 
 
 @route("prompt", "upload-public-file", response_class=JSONResponse)

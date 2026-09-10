@@ -562,7 +562,7 @@ def test_index_shows_latest_prompt_comments(guest_client):
 ])
 def test_legacy_prompt_page_urls_redirect_to_prompts(guest_client, legacy_path, prompt_path):
     response = get(guest_client, f"{legacy_path}?limit=5", allow_redirects=False)
-    assert response.status_code == 301
+    assert response.status_code == 308
     assert response.headers["location"] == f"{prompt_path}?limit=5"
 
 
@@ -959,7 +959,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
         "/prompts?type=latest&status=published&tags=coverage-tag",
         allow_redirects=False,
     )
-    assert renamed_old_tag_page.status_code == 301
+    assert renamed_old_tag_page.status_code == 308
     assert "coverage-tag-updated" in renamed_old_tag_page.headers["location"]
     renamed_current_tag_page = get(guest_client, "/prompts?type=latest&status=published&tags=coverage-tag-updated")
     assert renamed_current_tag_page.status_code == 200
@@ -1207,19 +1207,28 @@ def test_logout_endpoint_wrong_method_failure(guest_client):
     assert failure.status_code == 405
 
 
-@pytest.mark.parametrize("legacy_path, canonical_path", [
-    ("/root-functional", "/@root-functional"),
-    ("/root-functional/updated-functional-endpoint-coverage-prompt",
-     "/@root-functional/updated-functional-endpoint-coverage-prompt"),
-])
-def test_legacy_slug_urls_redirect(guest_client, legacy_path, canonical_path):
-    response = get(guest_client, f"{legacy_path}?limit=5&offset=2", allow_redirects=False)
-    assert response.status_code == 301
-    assert response.headers["Location"].endswith(f"{canonical_path}?limit=5&offset=2")
+def test_legacy_slug_urls_redirect_only_for_existing_entities(guest_client):
+    prompt_slug = functional_state["prompt_slug"]
+    for legacy_path, canonical_path in [
+        ("/root-functional", "/@root-functional"),
+        (f"/root-functional/{prompt_slug}", f"/@root-functional/{prompt_slug}"),
+    ]:
+        response = get(guest_client, f"{legacy_path}?limit=5&offset=2", allow_redirects=False)
+        assert response.status_code == 308
+        assert response.headers["Location"].endswith(f"{canonical_path}?limit=5&offset=2")
+
+    for path in [
+        "/missing-functional-user",
+        "/root-functional/missing-functional-prompt",
+        f"/missing-functional-user/{prompt_slug}",
+    ]:
+        response = get(guest_client, path, allow_redirects=False)
+        assert response.status_code == 404
+        assert "Location" not in response.headers
 
 
 @pytest.mark.parametrize("path", [
-    "/articles", "/articles-fragment", "/latest/articles",
+    "/prompts", "/prompts-fragment", "/latest/prompts",
     "/users", "/latest/users", "/users-fragment", "/tags",
     "/@root-functional",
 ])
@@ -1229,7 +1238,7 @@ def test_query_endpoints_ignore_undeclared_parameters(guest_client, path):
 
 
 @pytest.mark.parametrize("path", [
-    "/articles", "/articles-fragment", "/latest/articles",
+    "/prompts", "/prompts-fragment", "/latest/prompts",
     "/users", "/latest/users", "/users-fragment", "/tags",
     "/@root-functional",
 ])

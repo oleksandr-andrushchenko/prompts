@@ -7,7 +7,8 @@ from shared_utils import (
     PromptByOldSlugRequestedError, User, UserStatus, UserNotFoundError,
     UserByOldSlugRequestedError, NotAuthenticatedError, Permission,
     find_prompt_by_slug_follow_redirects, find_user_by_username_follow_redirects,
-    verify_authorization, get_web_base_url, is_prod, get_auth_token_max_age,
+    verify_authorization, get_prompt_url, get_user_url, get_web_base_url, is_prod,
+    get_auth_token_max_age,
 )
 
 
@@ -304,6 +305,19 @@ def get_user_by_slug(username: str, cur_user: User = None) -> User:
     if user.username != username:
         raise UserByOldSlugRequestedError(username, user)
     return user
+
+
+def get_legacy_user_redirect_url(req, slug: str) -> str | None:
+    user = find_user_by_username_follow_redirects(slug)
+    return get_user_url(req, user) if user else None
+
+
+def get_legacy_prompt_redirect_url(req, user_slug: str, prompt_slug: str) -> str | None:
+    user = find_user_by_username_follow_redirects(user_slug)
+    prompt = find_prompt_by_slug_follow_redirects(prompt_slug)
+    if not user or not prompt or prompt.user_slug != user.username:
+        return None
+    return get_prompt_url(req, prompt)
 
 
 

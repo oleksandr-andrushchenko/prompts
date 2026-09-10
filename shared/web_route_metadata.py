@@ -35,6 +35,4 @@ WEB_URL_ROUTES = {
     "utils": "/utils",
     "user-by-slug": "/@{slug}",
     "prompt-by-slugs": "/@{user_slug}/{prompt_slug}",
-    "legacy-user-by-slug": "/{slug}",
-    "legacy-prompt-by-slugs": "/{user_slug}/{prompt_slug}",
 }
