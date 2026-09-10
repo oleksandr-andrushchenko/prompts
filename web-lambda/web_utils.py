@@ -2,8 +2,13 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, urlparse
 
 from shared_utils import *
-from shared_utils import get_html_content
-from web import HTMLResponse
+from shared_utils import (
+    Prompt, PromptStatus, PromptQueryType, PromptNotFoundError,
+    PromptByOldSlugRequestedError, User, UserStatus, UserNotFoundError,
+    UserByOldSlugRequestedError, NotAuthenticatedError, Permission,
+    find_prompt_by_slug_follow_redirects, find_user_by_username_follow_redirects,
+    verify_authorization, get_web_base_url, is_prod, get_auth_token_max_age,
+)
 
 
 def get_login_redirect_url(callback_url: str) -> str:
@@ -205,13 +210,13 @@ def get_latest_published_prompts(limit: int = BaseQueryDTO.DEFAULT_LIMIT) -> lis
 
 def should_show_popular_prompts(latest_prompts: list[Prompt], popular_prompts: list[Prompt]) -> bool:
     """
-    Show popular prompts only if popular_prompts differ from latest_prompts.
-    Comparison is based on prompt IDs.
+    Show popular posts only if popular_posts differ from latest_posts.
+    Comparison is based on post IDs.
     """
     latest_ids = [prompt.id for prompt in latest_prompts]
     popular_ids = [prompt.id for prompt in popular_prompts]
 
-    # Show popular prompts only if the lists are not exactly equal
+    # Show popular posts only if the lists are not exactly equal
     return latest_ids != popular_ids
 
 
@@ -243,7 +248,7 @@ def get_latest_prompt_comments(query_dto: PromptCommentQueryDTO = None) -> list[
     return query_dynamodb_items(
         query_dto=query_dto,
         index_name="PROMPT_COMMENTS_BY_CREATED_AT",
-        key_condition_expr=Key("prompt_comment_pk").eq(f"PROMPT_COMMENT"),
+        key_condition_expr=Key("prompt_comment_pk").eq("PROMPT_COMMENT"),
         map_fn=prompt_comment_from_dynamodb,
     )
 
@@ -253,13 +258,77 @@ def get_popular_active_users(limit: int = BaseQueryDTO.DEFAULT_LIMIT) -> list[Us
     return get_popular_users(query_dto)
 
 
-def get_error_response(status_code: int, details: dict | str = None):
-    from http import HTTPStatus
-    status = HTTPStatus(status_code)
-    content = get_html_content("error.html", {
-        "code": status_code,
-        "title": status.phrase,
-        "message": status.description,
-        "details": details,
-    })
-    return HTMLResponse(status_code=status_code, content=content)
+def parse_prompts_url_slugs_path(slugs_path: str) -> dict:
+    data = {}
+    slugs = [p for p in slugs_path.split("/") if p]
+
+    if not slugs:
+        return {}
+
+    try:
+        data["type"] = PromptQueryType(slugs[0])
+        slugs = slugs[1:]
+    except ValueError:
+        pass
+
+    data["tags"] = slugs
+
+    return data
+
+
+
+def get_prompt_by_slugs(user_slug: str, prompt_slug: str, cur_user: User = None) -> Prompt:
+    prompt = find_prompt_by_slug_follow_redirects(prompt_slug)
+    if prompt is None:
+        raise PromptNotFoundError(f"Prompt '{prompt_slug}' not found")
+    if prompt.user_slug != user_slug:
+        raise UserNotFoundError(f"User '{user_slug}' not found")
+    if prompt.status != PromptStatus.PUBLISHED:
+        if not cur_user:
+            raise NotAuthenticatedError()
+        verify_authorization(cur_user, Permission.READ_NON_PUBLISHED_PROMPT, prompt)
+    if prompt.slug != prompt_slug:
+        raise PromptByOldSlugRequestedError(prompt_slug, prompt)
+    return prompt
+
+
+
+def get_user_by_slug(username: str, cur_user: User = None) -> User:
+    user = find_user_by_username_follow_redirects(username)
+    if user is None:
+        raise UserNotFoundError(f"User '{username}' not found")
+    if user.status != UserStatus.ACTIVE:
+        if not cur_user:
+            raise NotAuthenticatedError()
+        verify_authorization(cur_user, Permission.READ_NON_ACTIVE_USER, user)
+    if user.username != username:
+        raise UserByOldSlugRequestedError(username, user)
+    return user
+
+
+
+def _auth_cookie_domain() -> str | None:
+    hostname = urlparse(get_web_base_url()).hostname
+    if not hostname or hostname in {"localhost", "127.0.0.1"} or "." not in hostname:
+        return None
+    return f".{hostname}"
+
+
+
+def set_token_cookie(token, response):
+    response.delete_cookie("token")
+    response.set_cookie(
+        key="token",
+        value=token,
+        httponly=True,
+        secure=is_prod(),
+        domain=_auth_cookie_domain(),
+        samesite="lax",
+        max_age=get_auth_token_max_age(),
+    )
+
+
+
+def drop_token_cookie(response):
+    response.delete_cookie("token")
+    response.delete_cookie("token", domain=_auth_cookie_domain())

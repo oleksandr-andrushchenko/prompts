@@ -4,15 +4,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import PlainTextResponse
 
 from deps import (
-    OptCurUserDep,
     ImageFileDTODep,
-    CurUserDep,
-    PromptQueryDep,
     PromptCommentQueryDep,
-    PromptDep,
-    TagQueryDep,
-    UserQueryDep,
-    UserDep,
     UpdateUserDTODep,
     UpdateUserActivitySettingsDTODep,
     UpdateUserInterestsSettingsDTODep,
@@ -23,7 +16,6 @@ from deps import (
     UpdateUserStatusDTODep,
     PromptCommentDep,
     UpdatePromptCommentDTODep,
-    TagDep,
     UpdateTagDTODep,
     TagSubscriptionDTODep,
 )
@@ -79,6 +71,16 @@ from api_utils import (
     delete_tag_subscription,
 )
 from notifications import get_access_log_message
+from shared_deps import (
+    OptCurUserDep,
+    CurUserDep,
+    PromptQueryDep,
+    PromptDep,
+    TagQueryDep,
+    UserQueryDep,
+    UserDep,
+    TagDep,
+)
 from shared_utils import (
     find_tag,
     get_tags,

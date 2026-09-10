@@ -11,20 +11,31 @@ from shared_deps import (
     PromptDep,
     UserQueryDep,
     UserDep,
-    UserBySlugDep,
-    PromptBySlugsDep,
-    PromptQueryBySlugsDep,
-    UserQueryBySlugsDep,
-    set_token_cookie,
-    drop_token_cookie,
     TagDep,
     TagQueryDep,
 )
 from shared_utils import get_tags
-from web import Application, Request, HTTPException, HTMLResponse, JSONResponse, RedirectResponse, \
-    RequestValidationError, CORSMiddleware, FileResponse
-from web_utils import (
+from web import (
+    Application,
+    Request,
+    HTTPException,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    RequestValidationError,
+    CORSMiddleware,
+    FileResponse,
+)
+from web_deps import (
+    UserBySlugDep,
+    UserQueryBySlugsDep,
+    PromptBySlugsDep,
+    PromptQueryBySlugsDep,
     get_error_response,
+)
+from web_utils import (
+    set_token_cookie,
+    drop_token_cookie,
     to_thread,
     PromptQueryDTO,
     PromptCommentQueryDTO,

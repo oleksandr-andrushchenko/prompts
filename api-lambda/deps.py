@@ -4,14 +4,15 @@ The web lambda keeps the shared read/query dependencies in ``shared``;
 upload and mutation request parsing belongs to the API lambda.
 """
 
-from shared_deps import *
+from typing import Annotated
+
 from prompt_dtos import UpdatePromptCommentDTO, UpdatePromptCommentImpressionDTO, UpdatePromptDTO, UpdatePromptImpressionDTO, UpdatePromptStatusDTO, UpdateTagDTO
 from tag_subscription_dtos import TagSubscriptionDTO
 from basic_dtos import ImageFileDTO
-from query_dtos import TagQueryDTO
+from query_dtos import PromptCommentQueryDTO
 from user_dtos import UpdateUserDTO, UpdateUserActivitySettingsDTO, UpdateUserImpressionDTO, UpdateUserInterestsSettingsDTO, UpdateUserStatusDTO
 from shared_utils import PromptComment, PromptCommentNotFoundError, get_prompt_comment
-from web import Body, HTTPException, Request, RequestValidationError
+from web import Body, Depends, HTTPException, Request, RequestValidationError
 
 
 async def get_image_file(request: Request):
@@ -96,9 +97,8 @@ PromptCommentDep = Annotated[PromptComment, Depends(get_prompt_comment_by_id)]
 UpdatePromptCommentDTODep = Annotated[UpdatePromptCommentDTO, Depends(get_update_prompt_comment_dto)]
 UpdatePromptCommentImpressionDTODep = Annotated[
     UpdatePromptCommentImpressionDTO, Depends(get_update_prompt_comment_impression_dto)]
-TagQueryDep = Annotated[TagQueryDTO, Depends()]
-TagDep = Annotated[Tag, Depends(get_tag_by_slug)]
 UpdateTagDTODep = Annotated[UpdateTagDTO, Depends(get_update_tag_dto)]
 TagSubscriptionDTODep = Annotated[TagSubscriptionDTO, Depends(get_tag_subscription_dto)]
 ImageFileDTODep = Annotated[ImageFileDTO, Depends(get_image_file)]
 UpdateUserImpressionDTODep = Annotated[UpdateUserImpressionDTO, Depends(get_update_user_impression_dto)]
+PromptCommentQueryDep = Annotated[PromptCommentQueryDTO, Depends()]

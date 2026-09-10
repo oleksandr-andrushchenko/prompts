@@ -851,24 +851,6 @@ def get_tag_url(req, tag: Tag) -> str:
     return get_prompts_url(req, tags=[tag.slug])
 
 
-def parse_prompts_url_slugs_path(slugs_path: str) -> dict:
-    data = {}
-    slugs = [p for p in slugs_path.split("/") if p]
-
-    if not slugs:
-        return {}
-
-    try:
-        data["type"] = PromptQueryType(slugs[0])
-        slugs = slugs[1:]
-    except ValueError:
-        pass
-
-    data["tags"] = slugs
-
-    return data
-
-
 @pass_context
 def jinja2_users_url(ctx, query: UserQueryDTO | None = None, **params) -> str:
     return get_users_url(ctx.get("request"), query=query, **params)
@@ -1609,21 +1591,6 @@ def find_prompt_by_slug_follow_redirects(slug: str) -> Prompt | None:
         return prompt_from_dynamodb(item)
 
 
-def get_prompt_by_slugs(user_slug: str, prompt_slug: str, cur_user: User = None) -> Prompt:
-    prompt = find_prompt_by_slug_follow_redirects(prompt_slug)
-    if prompt is None:
-        raise PromptNotFoundError(f"Prompt '{prompt_slug}' not found")
-    if prompt.user_slug != user_slug:
-        raise UserNotFoundError(f"User '{user_slug}' not found")
-    if prompt.status != PromptStatus.PUBLISHED:
-        if not cur_user:
-            raise NotAuthenticatedError()
-        verify_authorization(cur_user, Permission.READ_NON_PUBLISHED_PROMPT, prompt)
-    if prompt.slug != prompt_slug:
-        raise PromptByOldSlugRequestedError(prompt_slug, prompt)
-    return prompt
-
-
 def find_prompt_comment(prompt_id: str, prompt_comment_id: str) -> PromptComment | None:
     item = get_dynamodb_item(f"PROMPT#{prompt_id}", f"COMMENT#{prompt_comment_id}")
     return prompt_comment_from_dynamodb(item) if item else None
@@ -1925,19 +1892,6 @@ def find_user_by_username_follow_redirects(slug: str) -> User | None:
             continue
 
         return user_from_dynamodb(item)
-
-
-def get_user_by_slug(username: str, cur_user: User = None) -> User:
-    user = find_user_by_username_follow_redirects(username)
-    if user is None:
-        raise UserNotFoundError(f"User '{username}' not found")
-    if user.status != UserStatus.ACTIVE:
-        if not cur_user:
-            raise NotAuthenticatedError()
-        verify_authorization(cur_user, Permission.READ_NON_ACTIVE_USER, user)
-    if user.username != username:
-        raise UserByOldSlugRequestedError(username, user)
-    return user
 
 
 class DecimalEncoder(json.JSONEncoder):
