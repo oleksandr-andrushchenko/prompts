@@ -24,7 +24,13 @@ from shared_utils import (
     TagNotFoundError,
     get_tag,
 )
-from web import Depends, HTTPException, Query, Request, RequestValidationError
+from web import (
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    parse_dto,
+)
 
 
 def _resolve_user(request: Request) -> User | None:
@@ -82,30 +88,19 @@ def get_user_by_id(user_id: str, cur_user: OptCurUserDep = None) -> User:
 def get_user_query_by_slugs(request: Request, type: str) -> UserQueryDTO:
     data = dict(request.query_params)
     data.update({"type": type})
-    try:
-        return UserQueryDTO(**data)
-    except ValueError as e:
-        raise RequestValidationError({"query": str(e)})
+    return parse_dto(UserQueryDTO, data)
 
 
 def get_prompt_query(request: Request, tags: list[str] = Query([])) -> PromptQueryDTO:
     data = dict(request.query_params)
-    data.pop("activities_year", None)
     data.update({"tags": tags})
-    try:
-        return PromptQueryDTO(**data)
-    except ValueError as e:
-        raise RequestValidationError({"query": str(e)})
+    return parse_dto(PromptQueryDTO, data)
 
 
 def get_prompt_query_by_slugs(request: Request, slugs_path: str) -> PromptQueryDTO:
     data = dict(request.query_params)
-    data.pop("activities_year", None)
     data.update(parse_prompts_url_slugs_path(slugs_path))
-    try:
-        return PromptQueryDTO(**data)
-    except ValueError as e:
-        raise RequestValidationError({"query": str(e)})
+    return parse_dto(PromptQueryDTO, data)
 
 
 def _get_user_by_slug(slug: str, cur_user: OptCurUserDep = None) -> User:

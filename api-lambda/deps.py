@@ -11,7 +11,7 @@ from basic_dtos import ImageFileDTO
 from query_dtos import TagQueryDTO
 from user_dtos import UpdateUserDTO, UpdateUserActivitySettingsDTO, UpdateUserImpressionDTO, UpdateUserInterestsSettingsDTO, UpdateUserStatusDTO
 from shared_utils import PromptComment, PromptCommentNotFoundError, get_prompt_comment
-from web import Body, HTTPException, Request
+from web import Body, HTTPException, Request, RequestValidationError
 
 
 async def get_image_file(request: Request):
