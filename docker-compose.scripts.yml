@@ -13,5 +13,7 @@ services:
       AWS_SECRET_ACCESS_KEY: dummy
       DYNAMODB_TABLE: app
       FUNCTION_TEMPLATES_DIR: "/app/api-lambda/templates"
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_CHAT_ID: ""
     volumes:
       - ./:/app
