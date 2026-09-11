@@ -828,6 +828,25 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     assert prompt_item["template"] == PROMPT_TEMPLATE
     assert prompt_item["image_filenames"] == [PROMPT_IMAGE_FILENAME]
 
+    invalid_links_template = (
+        PROMPT_TEMPLATE
+        + '<a href="/@root-functional/missing-prompt">Missing prompt</a>'
+        + '<a href="http://web-lambda:5000/@root-functional/missing-prompt">Missing prompt again</a>'
+    )
+    invalid_links = prompt(root_client, "/prompts", json={
+        "title": "Prompt with invalid links",
+        "description": "A prompt with invalid links.",
+        "category": "Code & Dev",
+        "outputs": ["text"],
+        "template": invalid_links_template,
+        "models": ["openai-gpt-4o"],
+        "tags": ["functional-tag"],
+    })
+    assert invalid_links.status_code == 422
+    template_error = invalid_links.json()["details"]["template"]
+    assert "duplicate links" in template_error
+    assert "non-existent internal links" in template_error
+
     create_failure = prompt(root_client, "/prompts", json={
         "title": "Invalid prompt payload",
         "description": "A functional endpoint coverage prompt.",
@@ -909,6 +928,18 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert "<picture>" not in raw_editor_content
     edit_failure = get(regular_client, f"/prompts/{prompt_id}/edit")
     assert edit_failure.status_code == 403
+
+    invalid_links_template = (
+        PROMPT_TEMPLATE
+        + '<a href="/rules">Rules one</a>'
+        + '<a href="http://web-lambda:5000/rules">Rules two</a>'
+        + '<a href="/root-functional/missing-prompt">Missing prompt</a>'
+    )
+    invalid_links = patch(root_client, f"/prompts/{prompt_id}", json={"template": invalid_links_template})
+    assert invalid_links.status_code == 422
+    template_error = invalid_links.json()["details"]["template"]
+    assert "duplicate links" in template_error
+    assert "non-existent internal links" in template_error
 
     update_success = patch(root_client, f"/prompts/{prompt_id}", json={
         "title": "Updated functional endpoint coverage prompt",

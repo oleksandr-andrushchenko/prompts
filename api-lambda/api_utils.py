@@ -1,6 +1,7 @@
 from dataclasses import replace
 from html.parser import HTMLParser
 from http import HTTPStatus
+from urllib.parse import unquote, urlparse
 
 from web import JSONResponse
 
@@ -11,7 +12,11 @@ from prompt_dtos import (
 from tag_subscription_dtos import TagSubscriptionDTO
 from basic_dtos import ContactMessageDTO, FileDTO, ImageFileDTO
 from shared_utils import *
-from shared_utils import User, get_prompts, get_tags, logger
+from shared_utils import (
+    User, find_prompt, find_prompt_by_slug_follow_redirects,
+    find_user_by_username_follow_redirects, get_prompts, get_tags,
+    get_web_base_url, logger,
+)
 from query_dtos import PromptQueryDTO
 from user_dtos import (
     UpdateUserDTO, UpdateUserImpressionDTO, UpdateUserStatusDTO,
@@ -19,6 +24,7 @@ from user_dtos import (
     UserImpressionAction,
 )
 from prompt_models import get_prompt_model
+from web import RequestValidationError
 
 
 def get_error_response(status_code: int, details: dict | str = None):
@@ -41,6 +47,89 @@ class PromptHrefExtractor(HTMLParser):
         for name, value in attrs:
             if name == "href" and value is not None:
                 self.hrefs.append(value)
+
+
+def _get_internal_prompt_link(href: str) -> tuple[str, str | None, str] | None:
+    """Return the lookup type, optional username, and prompt identifier for an internal prompt URL."""
+    parsed = urlparse(href)
+    if parsed.netloc:
+        site = urlparse(get_web_base_url())
+        if not site.netloc or parsed.netloc.lower() != site.netloc.lower():
+            return None
+    elif parsed.scheme:
+        return None
+
+    path = unquote(parsed.path).rstrip("/")
+    parts = path.split("/")
+    if len(parts) != 3 or parts[0]:
+        return None
+
+    user_slug, prompt_identifier = parts[1:]
+    if user_slug == "prompts":
+        return "id", None, prompt_identifier
+    if user_slug.startswith("@"):
+        user_slug = user_slug[1:]
+    if not user_slug or not prompt_identifier:
+        return None
+    return "slug", user_slug, prompt_identifier
+
+
+def _internal_prompt_link_exists(link: tuple[str, str | None, str]) -> bool:
+    lookup_type, user_slug, prompt_identifier = link
+    if lookup_type == "id":
+        return find_prompt(prompt_identifier) is not None
+
+    prompt = find_prompt_by_slug_follow_redirects(prompt_identifier)
+    user = find_user_by_username_follow_redirects(user_slug)
+    return prompt is not None and user is not None and prompt.owner_id == user.id
+
+
+def _normalize_href_for_duplicates(href: str) -> str:
+    """Make absolute and root-relative same-site URLs comparable."""
+    parsed = urlparse(href)
+    if parsed.netloc:
+        site = urlparse(get_web_base_url())
+        if not site.netloc or parsed.netloc.lower() != site.netloc.lower():
+            return href
+    elif parsed.scheme or not parsed.path.startswith("/"):
+        return href
+
+    path = unquote(parsed.path).rstrip("/") or "/"
+    query = f"?{parsed.query}" if parsed.query else ""
+    fragment = f"#{parsed.fragment}" if parsed.fragment else ""
+    return f"{path}{query}{fragment}"
+
+
+def validate_prompt_template_links(content: str) -> None:
+    parser = PromptHrefExtractor()
+    parser.feed(content)
+    parser.close()
+
+    seen = set()
+    duplicate_hrefs = []
+    for href in parser.hrefs:
+        normalized_href = _normalize_href_for_duplicates(href)
+        if normalized_href in seen and href not in duplicate_hrefs:
+            duplicate_hrefs.append(href)
+        seen.add(normalized_href)
+
+    missing_hrefs = []
+    checked_internal_links = set()
+    for href in parser.hrefs:
+        link = _get_internal_prompt_link(href)
+        if link is None or link in checked_internal_links:
+            continue
+        checked_internal_links.add(link)
+        if not _internal_prompt_link_exists(link):
+            missing_hrefs.append(href)
+
+    errors = []
+    if duplicate_hrefs:
+        errors.append(f"duplicate links: {', '.join(duplicate_hrefs)}")
+    if missing_hrefs:
+        errors.append(f"non-existent internal links: {', '.join(missing_hrefs)}")
+    if errors:
+        raise RequestValidationError({"template": "; ".join(errors)})
 
 
 def get_prompt_hrefs(query_dto: PromptQueryDTO, cur_user: User | None = None) -> dict[str, list[str]]:
@@ -408,6 +497,7 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
     category = prompt_dto.category
     outputs = prompt_dto.outputs
     template = prompt_dto.template
+    validate_prompt_template_links(template)
     image_filenames = prompt_dto.image_filenames
     tags = sanitize_tags(prompt_dto.tags)
     slug = to_kebab_case(title)
@@ -477,6 +567,7 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
             if (model := get_prompt_model(model_slug))
         ]
 
+    validate_prompt_template_links(changes.get("template", prompt.template))
     if "tags" in changes:
         changes["tags"] = sanitize_tags(changes["tags"])
     old_status = prompt.status
