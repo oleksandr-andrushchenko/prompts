@@ -1,7 +1,6 @@
 import asyncio
 
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import PlainTextResponse
 
 from deps import (
     ImageFileDTODep,
@@ -88,16 +87,10 @@ from shared_utils import (
 
 from web import Application, Request, HTTPException, HTMLResponse, JSONResponse, RedirectResponse, \
     RequestValidationError, CORSMiddleware
-
 from web import TrailingSlashMiddleware
 
 app = Application()
 app.add_middleware(TrailingSlashMiddleware)
-
-
-@app.get("/robots.txt", name="api-robots")
-async def robots_txt():
-    return PlainTextResponse("User-agent: *\nDisallow: /\n")
 
 
 from api_route_metadata import API_URL_ROUTES
