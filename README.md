@@ -55,9 +55,25 @@
 
 ## AWS deployment
 
-Configure `.env` from `.env.example`, including the existing public Route 53 hosted
-zone, domain, application settings, and AWS profile/region. Authenticate the AWS
-CLI first (`make aws-login` when needed), then run:
+Use `.env.example` as the template for both environment files. Keep local
+development values in `.env`, and configure production deployment values in
+`.env.prod`, including the existing public Route 53 hosted zone, domain,
+application settings, and AWS profile/region. Both files are ignored by Git.
+
+The single `Makefile` retrieves each value from its intended file without
+including or exporting either file wholesale. Local Docker settings, ports, and
+the local DynamoDB region come from `.env`. AWS, application, domain, and
+deployment settings come from `.env.prod`. Lambda ZIP timestamps are stored in
+`.env.prod`, including when a standalone `generate-*-lambda-code-files` command
+is used.
+
+To use another production environment file for a command, override its path:
+
+```sh
+make PROD_ENV_FILE=.env.staging deploy
+```
+
+Authenticate the AWS CLI first (`make aws-login` when needed), then run:
 
 ```sh
 make deploy
