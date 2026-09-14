@@ -279,10 +279,13 @@ def parse_prompts_url_slugs_path(slugs_path: str) -> dict:
 
 
 def get_prompt_by_slugs(user_slug: str, prompt_slug: str, cur_user: User = None) -> Prompt:
-    prompt = find_prompt_by_slug_follow_redirects(prompt_slug)
+    user = find_user_by_username_follow_redirects(user_slug)
+    if user is None:
+        raise UserNotFoundError(f"User '{user_slug}' not found")
+    prompt = find_prompt_by_slug_follow_redirects(user.id, prompt_slug)
     if prompt is None:
         raise PromptNotFoundError(f"Prompt '{prompt_slug}' not found")
-    if prompt.user_slug != user_slug:
+    if user.username != user_slug or prompt.user_slug != user.username:
         raise UserNotFoundError(f"User '{user_slug}' not found")
     if prompt.status != PromptStatus.PUBLISHED:
         if not cur_user:
@@ -314,8 +317,10 @@ def get_legacy_user_redirect_url(req, slug: str) -> str | None:
 
 def get_legacy_prompt_redirect_url(req, user_slug: str, prompt_slug: str) -> str | None:
     user = find_user_by_username_follow_redirects(user_slug)
-    prompt = find_prompt_by_slug_follow_redirects(prompt_slug)
-    if not user or not prompt or prompt.user_slug != user.username:
+    if not user:
+        return None
+    prompt = find_prompt_by_slug_follow_redirects(user.id, prompt_slug)
+    if not prompt or prompt.user_slug != user.username:
         return None
     return get_prompt_url(req, prompt)
 

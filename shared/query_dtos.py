@@ -1,6 +1,8 @@
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 
+from prompt_models import PromptCategory
+
 
 @dataclass(slots=True)
 class BaseQueryDTO:
@@ -98,6 +100,7 @@ class PromptQueryDTO(BaseQueryDTO):
     DEFAULT_STATUS = PromptStatus.PUBLISHED
 
     tags: list[str] = field(default_factory=list)
+    category: str | None = None
     type: PromptQueryType = PromptQueryType.LATEST
     status: PromptStatus = PromptStatus.PUBLISHED
 
@@ -105,10 +108,12 @@ class PromptQueryDTO(BaseQueryDTO):
         BaseQueryDTO.__post_init__(self)
         self.type = PromptQueryType(self.type)
         self.status = PromptStatus(self.status)
+        if self.category is not None:
+            self.category = PromptCategory(self.category).value
 
     def has_params(self):
         return BaseQueryDTO.has_params(self) or bool(
-            self.tags) or self.type != self.DEFAULT_TYPE or self.status != self.DEFAULT_STATUS
+            self.tags) or self.category is not None or self.type != self.DEFAULT_TYPE or self.status != self.DEFAULT_STATUS
 
 
 @dataclass(slots=True)

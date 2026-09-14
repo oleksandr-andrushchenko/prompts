@@ -1,5 +1,7 @@
 {% extends "layout.html" %}
-{% set layout_assets = {"masonry": true} %}
+{% set result_images = prompt.result_files|selectattr('format', 'equalto', 'image')|map(attribute='filename')|list if prompt else [] %}
+{% set template_language = "none" if prompt.template.format == "code" else prompt.template.format %}
+{% set layout_assets = {"masonry": true, "prism": prompt.template.format != "text"} %}
 {% set prompt_canonical_url = prompt_url(prompt, absolute=True) %}
 {% set prompt_alternate_url = url("prompt", prompt_id=prompt.id, absolute=True) %}
 {% set author_canonical_url = user_url(author, absolute=True) %}
@@ -10,14 +12,14 @@
 {% set og_type = "prompt" %}
 {% set meta_canonical_url = prompt_canonical_url %}
 {% set og_url = meta_canonical_url %}
-{% set og_img_filename = prompt.image_filenames[0] %}
+{% set og_img_filename = result_images[0] %}
 {% set prompt_og_author = author_canonical_url %}
 {% set prompt_og_published_time = prompt.published_at | iso_utc if prompt.published_at else None %}
 {% set prompt_og_modified_time = prompt.updated_at | iso_utc if prompt.updated_at and prompt.published_at else None %}
 {% set prompt_og_tags = prompt.tags %}
 {% block meta_schema %}
-    {% set prompt_body = prompt.template %}
-    {% set prompt_image_url = prompt.image_filenames[0] if prompt.image_filenames[0] and (prompt.image_filenames[0].startswith('http://') or prompt.image_filenames[0].startswith('https://')) else static_url(prompt.image_filenames[0], absolute=True) if prompt.image_filenames[0] else None %}
+    {% set prompt_body = prompt.template.content %}
+    {% set prompt_image_url = result_images[0] if result_images[0] and (result_images[0].startswith('http://') or result_images[0].startswith('https://')) else static_url(result_images[0], absolute=True) if result_images[0] else None %}
     {% set comment_schemas = namespace(values=[]) %}
     {% for prompt_comment in comments %}
         {% set comment_user = prompt_comment.get_user() %}
@@ -120,16 +122,20 @@
                     {% endfor %}
                 {% endif %}
 
-                <span class="badge rounded-pill text-bg-light" title="Category">{{ prompt.category }}</span>
+                <a class="badge rounded-pill text-bg-light text-decoration-none" title="Category"
+                   href="{{ prompts_url(category=prompt.category) }}">{{ prompt.category_label }}</a>
 
-                {% for output in prompt.outputs %}
-                    <span class="badge rounded-pill text-bg-light" title="Output">{{ output|capitalize }}</span>
+                <span class="badge rounded-pill text-bg-light">Template: {{ prompt.template.format|capitalize }}</span>
+                {% include "fragments/parameterized-label.html" %}
+                {% for label, ports in [('Input', prompt.inputs), ('Output', prompt.outputs)] %}
+                    {% for port in ports %}
+                        <span class="badge rounded-pill text-bg-light" title="{{ port.description|default('') }}">{{ label }}: {{ port.name }} ({{ port.formats|join(', ') or 'unspecified' }}){% if label == 'Input' and not port.required %} · optional{% endif %}{% if port.default is defined %} · default: {{ port.default }}{% endif %}</span>
+                    {% endfor %}
                 {% endfor %}
 
                 {% if prompt.models %}
                     {% for model in prompt.models %}
-                        <span class="badge rounded-pill text-bg-light"
-                              title="Model">{{ model.title }} ({{ model.version }})</span>
+                        <span class="badge rounded-pill text-bg-light" title="Model">{{ model.value }}</span>
                     {% endfor %}
                 {% endif %}
             </div>
@@ -160,14 +166,41 @@
                     </p>
                 </header>
 
-                {% if prompt.image_filenames %}
+                {% set other_results = prompt.result_files|rejectattr('format', 'equalto', 'image')|list %}
+                {% if other_results %}
+                    <section class="mb-4" aria-label="Prompt execution results">
+                        <h2 class="h5 mb-2">Example results</h2>
+                        {% for result in other_results %}
+                            <div class="mb-3">
+                                {% if result.format == 'video' %}
+                                    <video class="w-100 rounded" controls preload="metadata"
+                                           aria-label="Example video {{ loop.index }}">
+                                        <source src="{{ static_url(result.filename, absolute=True) }}">
+                                        Your browser does not support video playback.
+                                    </video>
+                                {% elif result.format == 'audio' %}
+                                    <audio class="w-100" controls preload="metadata"
+                                           aria-label="Example audio {{ loop.index }}">
+                                        <source src="{{ static_url(result.filename, absolute=True) }}">
+                                        Your browser does not support audio playback.
+                                    </audio>
+                                {% endif %}
+                                <a href="{{ static_url(result.filename, absolute=True) }}" download>
+                                    Download {{ result.format }} result {{ loop.index }}
+                                </a>
+                            </div>
+                        {% endfor %}
+                    </section>
+                {% endif %}
+
+                {% if result_images %}
                     <section class="prompt-results mb-4">
                         <h2 class="h5 mb-2 text-decoration-underline">Screenshots</h2>
                         {% set carousel_id = "prompt-output-carousel-" ~ prompt.id %}
                         <div id="{{ carousel_id }}" class="carousel slide" aria-label="Prompt output images">
-                            {% if prompt.image_filenames|length > 1 %}
+                            {% if result_images|length > 1 %}
                                 <div class="carousel-indicators">
-                                    {% for filename in prompt.image_filenames %}
+                                    {% for filename in result_images %}
                                         <button type="button" data-bs-target="#{{ carousel_id }}"
                                                 data-bs-slide-to="{{ loop.index0 }}"
                                                 class="{% if loop.first %}active{% endif %}"
@@ -177,7 +210,7 @@
                                 </div>
                             {% endif %}
                             <div class="carousel-inner rounded">
-                                {% for filename in prompt.image_filenames %}
+                                {% for filename in result_images %}
                                     <div class="carousel-item{% if loop.first %} active{% endif %}">
                                         {% with filename=filename, alt=prompt.title ~ " output " ~ loop.index, img_class="d-block w-100 img-fluid", img_style="max-height: 70vh; object-fit: contain;", figure=False %}
                                             {% include "fragments/image.html" %}
@@ -185,7 +218,7 @@
                                     </div>
                                 {% endfor %}
                             </div>
-                            {% if prompt.image_filenames|length > 1 %}
+                            {% if result_images|length > 1 %}
                                 <button class="carousel-control-prev" type="button" data-bs-target="#{{ carousel_id }}"
                                         data-bs-slide="prev">
                                     <span class="carousel-control-prev-icon" aria-hidden="true"></span>
@@ -202,9 +235,34 @@
                 {% endif %}
 
                 <section class="prompt-content mb-4">
-                    <h2 class="h5 text-decoration-underline">Prompt Template</h2>
-                    <div class="prompt-content-text">{{ prompt.template }}</div>
+                    <h2 class="h5 text-decoration-underline">Prompt template</h2>
+                    {% if prompt.template.format == "text" %}
+                        <div class="prompt-content-text mb-3">{{ prompt.template.content }}</div>
+                    {% else %}
+                        <pre class="language-{{ template_language }} mb-3"><code class="language-{{ template_language }}">{{ prompt.template.content }}</code></pre>
+                    {% endif %}
                 </section>
+
+                {% if prompt.params %}
+                    <section class="prompt-params mb-4" aria-labelledby="prompt-params-heading">
+                        <h2 class="h5 text-decoration-underline" id="prompt-params-heading">Parameters</h2>
+                        <div class="list-group">
+                            {% for param in prompt.params %}
+                                <div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                    <code>{{ '${' }}{{ param.name }}{% if param.default is defined %}:{{ param.default }}{% endif %}{{ '}' }}</code>
+                                    <span>
+                                        <span class="fw-semibold">{{ param.name }}</span>
+                                        {% if param.default is defined %}
+                                            <span class="text-secondary">Default: <code>{{ param.default }}</code></span>
+                                        {% else %}
+                                            <span class="text-secondary">Required</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endif %}
             </article>
 
             <section class="prompt-comments mb-4">

@@ -9,6 +9,7 @@ from typing import Annotated
 from prompt_dtos import UpdatePromptCommentDTO, UpdatePromptCommentImpressionDTO, UpdatePromptDTO, UpdatePromptImpressionDTO, UpdatePromptStatusDTO, UpdateTagDTO
 from tag_subscription_dtos import TagSubscriptionDTO
 from basic_dtos import ImageFileDTO
+from category_dtos import UpdateCategoryDTO
 from query_dtos import PromptCommentQueryDTO
 from user_dtos import UpdateUserDTO, UpdateUserActivitySettingsDTO, UpdateUserImpressionDTO, UpdateUserInterestsSettingsDTO, UpdateUserStatusDTO
 from shared_utils import PromptComment, PromptCommentNotFoundError, get_prompt_comment
@@ -84,6 +85,10 @@ def get_update_tag_dto(value: UpdateTagDTO = Body(...)) -> UpdateTagDTO:
     return value
 
 
+def get_update_category_dto(value: UpdateCategoryDTO = Body(...)) -> UpdateCategoryDTO:
+    return value
+
+
 UpdateUserDTODep = Annotated[UpdateUserDTO, Depends(get_update_user_dto)]
 UpdateUserActivitySettingsDTODep = Annotated[
     UpdateUserActivitySettingsDTO, Depends(get_update_user_activity_settings_dto)]
@@ -98,6 +103,7 @@ UpdatePromptCommentDTODep = Annotated[UpdatePromptCommentDTO, Depends(get_update
 UpdatePromptCommentImpressionDTODep = Annotated[
     UpdatePromptCommentImpressionDTO, Depends(get_update_prompt_comment_impression_dto)]
 UpdateTagDTODep = Annotated[UpdateTagDTO, Depends(get_update_tag_dto)]
+UpdateCategoryDTODep = Annotated[UpdateCategoryDTO, Depends(get_update_category_dto)]
 TagSubscriptionDTODep = Annotated[TagSubscriptionDTO, Depends(get_tag_subscription_dto)]
 ImageFileDTODep = Annotated[ImageFileDTO, Depends(get_image_file)]
 UpdateUserImpressionDTODep = Annotated[UpdateUserImpressionDTO, Depends(get_update_user_impression_dto)]

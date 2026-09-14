@@ -16,6 +16,7 @@ from deps import (
     PromptCommentDep,
     UpdatePromptCommentDTODep,
     UpdateTagDTODep,
+    UpdateCategoryDTODep,
     TagSubscriptionDTODep,
 )
 from api_utils import (
@@ -23,7 +24,6 @@ from api_utils import (
     to_thread,
     ContactMessageDTO,
     PromptDTO,
-    PromptQueryDTO,
     PromptCommentDTO,
     Tag,
     SlugDuplicationError,
@@ -68,6 +68,7 @@ from api_utils import (
     get_user_tag_subscriptions,
     create_tag_subscription,
     delete_tag_subscription,
+    update_category,
 )
 from notifications import get_access_log
 from shared_deps import (
@@ -79,10 +80,12 @@ from shared_deps import (
     UserQueryDep,
     UserDep,
     TagDep,
+    CategoryDep,
 )
 from shared_utils import (
     find_tag,
     get_tags,
+    get_categories,
 )
 
 from web import Application, Request, HTTPException, HTMLResponse, JSONResponse, RedirectResponse, \
@@ -347,13 +350,26 @@ async def _delete_tag_subscription(tag_subscription_id: str, cur_user: CurUserDe
 async def _update_tag(update_tag_dto: UpdateTagDTODep, tag: TagDep,
                               cur_user: CurUserDep,
                               request: Request) -> str:
-    update_tag(tag, update_tag_dto, cur_user, request)
+    update_tag(tag, update_tag_dto, cur_user)
     return get_tag_url(request, tag)
 
 
 @route("get", "tags", response_class=JSONResponse)
 async def _get_tags(query_dto: TagQueryDep) -> list[Tag]:
     return get_tags(query_dto)
+
+
+@route("get", "get-categories", response_class=JSONResponse)
+async def _get_categories():
+    return get_categories()
+
+
+@route("patch", "update-category", response_class=JSONResponse)
+async def _update_category(update_category_dto: UpdateCategoryDTODep,
+                           category: CategoryDep, cur_user: CurUserDep,
+                           request: Request) -> str:
+    update_category(category, update_category_dto, cur_user)
+    return get_url(request, "categories", True)
 
 
 @route("get", "tags-fragment", response_class=HTMLResponse)

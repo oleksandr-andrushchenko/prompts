@@ -1,3 +1,4 @@
+{% set result_images = prompt.result_files|selectattr('format', 'equalto', 'image')|map(attribute='filename')|list if prompt else [] %}
 <form id="prompt-form" novalidate>
     <fieldset class="mb-4">
         <label class="form-group w-100">
@@ -10,18 +11,26 @@
                   placeholder="Description">{{ prompt.description if prompt else "" }}</textarea>
         </label>
 
-        <label class="form-group w-100">
-        <textarea class="form-control editor" id="template" name="template"
-                  placeholder="Prompt template (use double-brace parameters)"
-                  rows="8">{{ prompt.template if prompt else "" }}</textarea>
-        </label>
+        <div class="form-group">
+            <label class="form-label" for="template-content">Template</label>
+            <textarea class="form-control prompt-template" id="template-content" name="template" rows="12"
+                      placeholder="Prompt template">{{ prompt.template.content if prompt else '' }}</textarea>
+            <div class="form-text">Use ${parameter} or ${parameter:default}. Parameters are extracted automatically; Inputs describe other required content or media.</div>
+        </div>
+        <div class="form-group mt-2">
+            <label class="form-label" for="template-format">Template format</label>
+            <select class="form-select" id="template-format" name="template_format">
+                {% for format in PROMPT_TEMPLATE_FORMATS %}
+                    <option value="{{ format.value }}" {% if prompt and prompt.template.format == format.value %}selected{% endif %}>{{ format.value|capitalize }}</option>
+                {% endfor %}
+            </select>
+        </div>
     </fieldset>
 
     <div class="form-group mb-4" id="result-images-widget">
-        <label class="form-label text-secondary mb-1" for="image_files">Screenshots (up to 8):</label>
-        <input type="hidden" id="image_filenames" name="image_filenames"
-               value="{{ prompt.image_filenames|join(", ") if prompt else "" }}">
-        <input class="form-control" type="file" id="image_files" accept="image/jpeg,image/png,image/gif" multiple
+        <label class="form-label text-secondary mb-1" for="image_files">Example images:</label>
+        <input type="hidden" name="result_files" data-form-ignore>
+        <input class="form-control" type="file" id="image_files" accept="image/jpeg,image/png,image/gif,image/webp" multiple
                data-form-ignore>
         <div class="input-group mt-2">
             <input class="form-control" type="url" id="image_url" placeholder="Paste an image URL">
@@ -39,38 +48,23 @@
                     <input class="form-check-input" type="radio" name="category" id="category-{{ loop.index }}"
                            value="{{ category.value }}"
                            {% if prompt and prompt.category == category.value %}checked{% endif %}>
-                    <label class="form-check-label" for="category-{{ loop.index }}">{{ category.value }}</label>
+                    <label class="form-check-label" for="category-{{ loop.index }}">{{ category.label }}</label>
                 </div>
             {% endfor %}
         </div>
     </fieldset>
 
-    <fieldset class="form-group mb-4">
-        <legend class="col-form-label text-secondary">Output:</legend>
-        <div class="d-flex flex-wrap gap-3">
-            {% for output in PROMPT_OUTPUTS %}
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="outputs" id="output-{{ loop.index }}"
-                           value="{{ output.value }}"
-                           {% if prompt and output.value in prompt.outputs %}checked{% endif %}>
-                    <label class="form-check-label"
-                           for="output-{{ loop.index }}">{{ output.value|capitalize }}</label>
-                </div>
-            {% endfor %}
-        </div>
-        <div class="form-text">Choose one or more output types.</div>
-    </fieldset>
+    {% include "fragments/prompt-ports.html" %}
 
     <fieldset class="form-group mb-4">
-        <legend class="col-form-label text-secondary">Recommended models:</legend>
+        <legend class="col-form-label text-secondary">Recommended models (optional):</legend>
         <div class="d-flex flex-wrap gap-3">
             {% for model in PROMPT_MODELS %}
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="models" id="model-{{ loop.index }}"
-                           value="{{ model.slug }}"
-                           {% if prompt and model.slug in (prompt.models | map(attribute="slug") | list) %}checked{% endif %}>
-                    <label class="form-check-label" for="model-{{ loop.index }}">{{ model.title }}
-                        ({{ model.version }})</label>
+                           value="{{ model.value }}"
+                           {% if prompt and model in prompt.models %}checked{% endif %}>
+                    <label class="form-check-label" for="model-{{ loop.index }}">{{ model.value }}</label>
                 </div>
             {% endfor %}
         </div>
@@ -100,11 +94,11 @@
       rules: {
         title: [
           {rule: "required"},
-          {rule: "maxLength", value: 140}
+          {rule: "maxLength", value: 200}
         ],
         description: [
           {rule: "required"},
-          {rule: "maxLength", value: 400}
+          {rule: "maxLength", value: 500}
         ],
         category: [
           {
@@ -112,23 +106,20 @@
             errorMessage: "Select a category"
           }
         ],
-        outputs: [
-          {
-            validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="outputs"]:checked').length > 0,
-            errorMessage: "Select at least one output type"
-          }
-        ],
-        models: [
-          {
-            validator: () => document.querySelector('#prompt-form').querySelectorAll('input[name="models"]:checked').length > 0,
-            errorMessage: "Select at least one recommended model"
-          }
-        ],
-        template: [
-          {rule: "required"},
-          {rule: "minLength", value: 1},
-          {rule: "maxLength", value: 100_000}
-        ],
+        template: [{
+          validator: () => {
+            const content = document.getElementById('template-content').value
+            return Boolean(content.trim()) && new TextEncoder().encode(content).length <= 300000
+          },
+          errorMessage: "Enter a non-empty template, up to 300 KB"
+        }],
+        ...Object.fromEntries(['inputs', 'outputs'].map(field => [field, [{
+          validator: () => {
+            const names = [...document.querySelectorAll(`#${field}-ports .port-name`)].map(input => input.value.trim())
+            return names.every(name => /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(name)) && new Set(names).size === names.length
+          },
+          errorMessage: "Use unique names with letters, digits and underscores, starting with a letter or underscore"
+        }]])),
         tags: [
           {rule: "tags", minCnt: 0, maxCnt: 3, minLen: 2, maxLen: 40}
         ]
@@ -137,12 +128,29 @@
         if (res) window.location.href = res
       },
       beforeSubmit: async (data) => {
+        data.template = {content: document.getElementById('template-content').value, format: data.template_format}
+        delete data.template_format
+        for (const field of ['inputs', 'outputs']) {
+          data[field] = [...document.querySelectorAll(`#${field}-ports .port-row`)].map(row => {
+            const port = {
+              name: row.querySelector('.port-name').value.trim(),
+              formats: [...row.querySelector('.port-formats').selectedOptions].map(option => option.value),
+              description: row.querySelector('.port-description').value.trim()
+            }
+            if (field === 'inputs') {
+              const defaultValue = row.querySelector('.port-default').value
+              port.required = defaultValue ? false : row.querySelector('.port-required').checked
+              if (defaultValue) port.default = defaultValue
+            }
+            return port
+          })
+        }
         const widget = document.getElementById("result-images-widget")
         const items = widget._imageItems || []
+        const otherResults = {{ (prompt.result_files|rejectattr('format', 'equalto', 'image')|list if prompt else [])|tojson }}
         const uploaded = await Promise.all(items.filter(item => item.upload).map(item => uploadPublicFile(item.file)))
-        const values = [...items.filter(item => !item.upload).map(item => item.value), ...uploaded].slice(0, 8)
-        data.image_filenames = values.length ? values.join(", ") : null
-        document.getElementById("image_filenames").value = data.image_filenames || ""
+        const values = [...items.filter(item => !item.upload).map(item => item.value), ...uploaded]
+        data.result_files = [...values.map(filename => ({filename, format: 'image'})), ...otherResults]
       },
       successMessage: "Prompt created!"
     })
@@ -154,8 +162,7 @@
     const fileInput = document.getElementById("image_files")
     const urlInput = document.getElementById("image_url")
     const preview = document.getElementById("result-image-previews")
-    const hidden = document.getElementById("image_filenames")
-    const items = ({{ (prompt.image_filenames if prompt else []) | tojson }}).map(value => ({value, preview: value}))
+    const items = ({{ (result_images if prompt else []) | tojson }}).map(value => ({value, preview: value}))
     const files = []
     widget._imageItems = items
     widget._imageFiles = files
@@ -174,7 +181,6 @@
         })
         preview.append(col)
       })
-      hidden.value = items.filter(item => !item.upload).map(item => item.value).join(", ")
     }
     const addFiles = selected => selected.forEach(file => {
       if (!file.type.startsWith("image/") || files.some(existing => existing.name === file.name && existing.size === file.size)) return

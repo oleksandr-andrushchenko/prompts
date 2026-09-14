@@ -15,6 +15,9 @@ from shared_utils import (
     Tag,
     TagNotFoundError,
     get_tag,
+    Category,
+    CategoryNotFoundError,
+    get_category,
 )
 from web import Depends, HTTPException, Query, Request, parse_dto
 
@@ -64,6 +67,13 @@ def get_tag_by_slug(slug: str, cur_user: CurUserDep) -> Tag:
         raise HTTPException(status_code=404, detail=str(e))
 
 
+def get_category_by_slug(slug: str) -> Category:
+    try:
+        return get_category(slug)
+    except CategoryNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 def get_user_by_id(user_id: str, cur_user: OptCurUserDep = None) -> User:
     try:
         return get_user(user_id, cur_user)
@@ -83,3 +93,4 @@ PromptDep = Annotated[Prompt, Depends(get_prompt_by_id)]
 PromptQueryDep = Annotated[PromptQueryDTO, Depends(get_prompt_query)]
 TagQueryDep = Annotated[TagQueryDTO, Depends()]
 TagDep = Annotated[Tag, Depends(get_tag_by_slug)]
+CategoryDep = Annotated[Category, Depends(get_category_by_slug)]

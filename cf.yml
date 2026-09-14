@@ -172,6 +172,8 @@ Resources:
           AttributeType: S
         - AttributeName: prompt_user_status_pk
           AttributeType: S
+        - AttributeName: prompt_category_status_pk
+          AttributeType: S
         - AttributeName: prompt_comment_pk
           AttributeType: S
         - AttributeName: prompt_comment_user_pk
@@ -179,7 +181,7 @@ Resources:
         - AttributeName: created_at
           AttributeType: N
       KeySchema:
-        - AttributeName: pk # e.g. "PROVIDER_USER#cognito#1", "USER#1", "PROMPT#1", "PROMPT_SLUG#slug1", "TAG#tag1", "TAG_COMBO#tag1#tag2", "CONTACT_MESSAGE#1"
+        - AttributeName: pk # e.g. "USER#1", "PROMPT#1", "PROMPT_SLUG#user1#slug1", "TAG#tag1", "CONTACT_MESSAGE#1"
           KeyType: HASH
         - AttributeName: sk # e.g. "META", "1759086095241", "PROMPT#1"
           KeyType: RANGE
@@ -212,7 +214,7 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-        - IndexName: PROMPTS_BY_SLUG # get_prompt_by_slugs
+        - IndexName: PROMPTS_BY_SLUG # legacy fallback while global slug records are migrated
           KeySchema:
             - AttributeName: prompt_slug # e.g. "prompt-title-about-something"
               KeyType: HASH
@@ -263,6 +265,22 @@ Resources:
             - AttributeName: prompt_user_status_pk # e.g. "PROMPT#1#published"
               KeyType: HASH
             - AttributeName: created_at # e.g. 1759086095241
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: PROMPTS_BY_CATEGORY_STATUS_CREATED_AT
+          KeySchema:
+            - AttributeName: prompt_category_status_pk # e.g. "PROMPT#code-dev#published"
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: PROMPTS_BY_CATEGORY_STATUS_RATING
+          KeySchema:
+            - AttributeName: prompt_category_status_pk
+              KeyType: HASH
+            - AttributeName: rating_sk
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
@@ -325,6 +343,7 @@ Resources:
                   - dynamodb:DeleteItem
                   - dynamodb:Query
                   - dynamodb:Scan
+                  - dynamodb:TransactWriteItems
                 Resource:
                   - !GetAtt DynamoDBTable.Arn
                   - !Sub "${DynamoDBTable.Arn}/index/*"
@@ -1035,6 +1054,9 @@ Outputs:
   StaticUrl:
     Value: !Sub "https://static.${DomainName}"
     Description: URL of the static file distribution
+  SiteBucketName:
+    Value: !Ref SiteBucket
+    Description: Name of the static and imported-media S3 bucket
   WebLambdaName:
     Value: !Ref WebFunction
     Description: Name of the Web Lambda function

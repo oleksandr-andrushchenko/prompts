@@ -2,6 +2,7 @@
 {% set current_route = request.scope.get("route_name") %}
 {% set layout_assets = layout_assets | default({}) %}
 {% set prompts_active = current_route in ["prompts", "prompt", "edit-prompt", "prompts-by-slugs", "prompt-by-slugs", "edit-tag"] %}
+{% set categories_active = current_route in ["categories", "edit-category"] %}
 {% set users_active = current_route in ["users", "users-by-slugs", "user", "edit-user", "user-by-slug"] %}
 {% set css_filenames = [
     "https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css",
@@ -133,6 +134,10 @@
             </button>
             <div class="collapse navbar-collapse" id="navbar">
                 <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link{% if categories_active %} active{% endif %}"
+                           href="{{ url('categories') }}"{% if categories_active %} aria-current="page"{% endif %}>Categories</a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link{% if current_route == "tags" %} active{% endif %}"
                            href="{{ url("tags") }}"{% if current_route == "tags" %}

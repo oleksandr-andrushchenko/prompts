@@ -6,14 +6,13 @@
 
         {% if preview %}
             <div class="text-secondary two-line-ellipsis">
-                {{ (prompt.description or prompt.template) | truncate(180, True, "...") }}
+                {{ (prompt.description or prompt.template.content) | truncate(180, True, "...") }}
             </div>
         {% endif %}
     </a>
 
     <div>
         {% include "fragments/prompt-rating.html" %}
-        <br>
 
         {% if prompt_user %}
             <small class="text-secondary bi bi-person" title="Author">
@@ -30,6 +29,8 @@
         {% elif prompt.status == PromptStatus.UNPUBLISHED %}
             <span class="badge text-bg-warning fs-6" title="Pending">Unpublished</span>
         {% endif %}
+
+        {% include "fragments/parameterized-label.html" %}
 
         {% if prompt.likes_count or prompt.dislikes_count %}
             <small class="text-secondary">

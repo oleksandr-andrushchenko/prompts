@@ -145,31 +145,31 @@ def create_dummy_fixtures(req=None) -> None:
         PromptDTO(
             title=unique_prompt_title(),
             description="A generated distributed-systems prompt.",
-            category="Code & Dev",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="code-dev",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
         PromptDTO(
             title=unique_prompt_title(),
             description="A generated distributed-systems prompt.",
-            category="Code & Dev",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="code-dev",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
         PromptDTO(
             title=unique_prompt_title(),
             description="A generated distributed-systems prompt.",
-            category="Code & Dev",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="code-dev",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
     ]
@@ -188,31 +188,31 @@ def create_dummy_fixtures(req=None) -> None:
         PromptDTO(
             title=unique_prompt_title(),
             description="A generated distributed-systems prompt.",
-            category="Code & Dev",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="code-dev",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
         PromptDTO(
             title=unique_prompt_title(),
             description="A generated distributed-systems prompt.",
-            category="Code & Dev",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="code-dev",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
         PromptDTO(
             title=unique_prompt_title(),
             description="A generated distributed-systems prompt.",
-            category="Code & Dev",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="code-dev",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
     ]
@@ -226,11 +226,11 @@ def create_dummy_fixtures(req=None) -> None:
         generated_prompt = create_prompt(PromptDTO(
             title=unique_prompt_title(),
             description="A generated fixture prompt.",
-            category="Other",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="other",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags(),
         ), root_user)
         update_prompt_status(
@@ -248,7 +248,7 @@ def create_dummy_fixtures(req=None) -> None:
             name=tag_name,
             image_action="replace",
             image_filename=image_filename,
-        ), root_user, req)
+        ), root_user)
         tag.image_filename = image_filename
 
     comment_texts = [
@@ -284,31 +284,31 @@ def create_dummy_fixtures(req=None) -> None:
         PromptDTO(
             title=unique_prompt_title(),
             description="An unpublished fixture prompt.",
-            category="Other",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="other",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
         PromptDTO(
             title=unique_prompt_title(),
             description="An unpublished fixture prompt.",
-            category="Other",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="other",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
         PromptDTO(
             title=unique_prompt_title(),
             description="An unpublished fixture prompt.",
-            category="Other",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="other",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
     ]
@@ -318,31 +318,31 @@ def create_dummy_fixtures(req=None) -> None:
         PromptDTO(
             title=unique_prompt_title(),
             description="A rejected fixture prompt.",
-            category="Other",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="other",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
         PromptDTO(
             title=unique_prompt_title(),
             description="A rejected fixture prompt.",
-            category="Other",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="other",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
         PromptDTO(
             title=unique_prompt_title(),
             description="A rejected fixture prompt.",
-            category="Other",
-            outputs=["text"],
-            template=random_prompt_template(),
+            category="other",
+            outputs=[{"name": "result", "formats": ["text"]}],
+            template={"content": random_prompt_template(), "format": "text"},
             models=["openai-gpt-4o"],
-            image_filenames=random_prompt_images(),
+            result_files=[{"filename": filename, "format": "image"} for filename in random_prompt_images()],
             tags=random_prompt_tags()
         ),
     ]

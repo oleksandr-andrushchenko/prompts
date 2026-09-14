@@ -1,0 +1,54 @@
+{% for field, label, ports in [('inputs', 'Inputs', prompt.inputs if prompt else []), ('outputs', 'Outputs', prompt.outputs if prompt else [])] %}
+    <fieldset class="mb-4">
+        <legend class="h6">{{ label }}</legend>
+        <p class="form-text">Name each {{ 'value the prompt needs' if field == 'inputs' else 'result the prompt produces' }}. Leave formats empty if unspecified.</p>
+        <input type="hidden" name="{{ field }}" data-form-ignore>
+        <div id="{{ field }}-ports" class="d-grid gap-2"></div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" type="button" id="add-{{ field }}">Add {{ field[:-1] }}</button>
+        <template id="{{ field }}-port-row">
+            <div class="port-row border rounded p-3">
+                <label class="form-label d-block">Name
+                    <input class="form-control port-name" data-form-ignore placeholder="{{ 'product_details' if field == 'inputs' else 'description' }}" maxlength="64">
+                </label>
+                <label class="form-label d-block">{{ 'Accepted' if field == 'inputs' else 'Possible' }} formats
+                    <select class="form-select port-formats" data-form-ignore multiple>
+                        {% for format in PROMPT_FORMATS %}<option value="{{ format.value }}">{{ format.value|capitalize }}</option>{% endfor %}
+                    </select>
+                </label>
+                <label class="form-label d-block">Description (optional)
+                    <input class="form-control port-description" data-form-ignore maxlength="400">
+                </label>
+                {% if field == 'inputs' %}
+                    <label class="form-label d-block">Default value (optional)
+                        <input class="form-control port-default" data-form-ignore maxlength="1000">
+                    </label>
+                    <label class="form-check"><input class="form-check-input port-required" data-form-ignore type="checkbox" checked> Required</label>
+                {% endif %}
+                <button class="btn btn-sm btn-outline-danger mt-2 remove-port" type="button">Remove</button>
+            </div>
+        </template>
+    </fieldset>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById({{ (field ~ '-ports')|tojson }})
+        const addPort = (port = {}) => {
+          if (container.children.length >= 64) return
+          const row = document.getElementById({{ (field ~ '-port-row')|tojson }}).content.firstElementChild.cloneNode(true)
+          row.querySelector('.port-name').value = port.name || ''
+          row.querySelector('.port-description').value = port.description || ''
+          for (const option of row.querySelector('.port-formats').options) option.selected = (port.formats || []).includes(option.value)
+          if (row.querySelector('.port-required')) row.querySelector('.port-required').checked = port.required !== false
+          if (row.querySelector('.port-default')) {
+            row.querySelector('.port-default').value = port.default || ''
+            row.querySelector('.port-default').addEventListener('input', event => {
+              if (event.target.value) row.querySelector('.port-required').checked = false
+            })
+          }
+          row.querySelector('.remove-port').addEventListener('click', () => row.remove())
+          container.append(row)
+        }
+        for (const port of {{ ports|tojson }}) addPort(port)
+        document.getElementById({{ ('add-' ~ field)|tojson }}).addEventListener('click', () => addPort())
+      })
+    </script>
+{% endfor %}

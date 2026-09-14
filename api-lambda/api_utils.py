@@ -4,39 +4,29 @@ from http import HTTPStatus
 import os
 from urllib.parse import unquote, urlparse
 
-from web import JSONResponse
-
+from basic_dtos import ContactMessageDTO, FileDTO, ImageFileDTO
+from category_dtos import UpdateCategoryDTO
 from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
     UpdatePromptStatusDTO, UpdateTagDTO,
 )
-from tag_subscription_dtos import TagSubscriptionDTO
-from basic_dtos import ContactMessageDTO, FileDTO, ImageFileDTO
+from prompt_contracts import extract_template_params
+from prompt_models import PromptCategory, get_prompt_model
+from query_dtos import PromptQueryDTO
 from shared_utils import *
 from shared_utils import (
-    User, find_prompt, find_prompt_by_slug_follow_redirects,
-    find_user_by_username_follow_redirects, get_prompts, get_tags,
+    Category, Permission, User, add_update_category_published_count_transact,
+    find_prompt, find_prompt_by_slug_follow_redirects,
+    find_user_by_username_follow_redirects, get_categories, get_prompts, get_tags,
     get_web_base_url, logger,
 )
-from query_dtos import PromptQueryDTO
+from tag_subscription_dtos import TagSubscriptionDTO
 from user_dtos import (
     UpdateUserDTO, UpdateUserImpressionDTO, UpdateUserStatusDTO,
     UpdateUserActivitySettingsDTO, UpdateUserInterestsSettingsDTO,
     UserImpressionAction,
 )
-from prompt_models import get_prompt_model
-from web import RequestValidationError
-
-
-def get_error_response(status_code: int, details: dict | str = None):
-    """Return JSON for API errors, including requests with no matched route."""
-    status = HTTPStatus(status_code)
-    return JSONResponse(status_code=status_code, content={
-        "code": status_code,
-        "title": status.phrase,
-        "message": status.description,
-        "details": details,
-    })
+from web import JSONResponse, RequestValidationError
 
 
 class PromptHrefExtractor(HTMLParser):
@@ -44,14 +34,13 @@ class PromptHrefExtractor(HTMLParser):
         super().__init__()
         self.hrefs: list[str] = []
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, _tag, attrs):
         for name, value in attrs:
             if name == "href" and value is not None:
                 self.hrefs.append(value)
 
 
 def _get_internal_prompt_link(href: str) -> tuple[str, str | None, str] | None:
-    """Return the lookup type, optional username, and prompt identifier for an internal prompt URL."""
     parsed = urlparse(href)
     if parsed.netloc:
         site = urlparse(get_web_base_url())
@@ -79,14 +68,13 @@ def _internal_prompt_link_exists(link: tuple[str, str | None, str]) -> bool:
     lookup_type, user_slug, prompt_identifier = link
     if lookup_type == "id":
         return find_prompt(prompt_identifier) is not None
-
-    prompt = find_prompt_by_slug_follow_redirects(prompt_identifier)
     user = find_user_by_username_follow_redirects(user_slug)
-    return prompt is not None and user is not None and prompt.owner_id == user.id
+    if user is None:
+        return False
+    return find_prompt_by_slug_follow_redirects(user.id, prompt_identifier) is not None
 
 
 def _normalize_href_for_duplicates(href: str) -> str:
-    """Make absolute and root-relative same-site URLs comparable."""
     parsed = urlparse(href)
     if parsed.netloc:
         site = urlparse(get_web_base_url())
@@ -135,7 +123,6 @@ def validate_prompt_template_links(content: str) -> None:
 
 def get_prompt_hrefs(query_dto: PromptQueryDTO, cur_user: User | None = None) -> dict[str, list[str]]:
     """Collect template hrefs across all pages matching the prompt query."""
-    # Traverse the status index so tag filtering cannot discard a page cursor.
     query = replace(query_dto, tags=[])
     wanted_tags = set(query_dto.tags)
     result = {}
@@ -144,13 +131,24 @@ def get_prompt_hrefs(query_dto: PromptQueryDTO, cur_user: User | None = None) ->
             if not wanted_tags.issubset(prompt.tags):
                 continue
             parser = PromptHrefExtractor()
-            parser.feed(prompt.template)
+            parser.feed(prompt.template["content"])
             parser.close()
             result[prompt.id] = parser.hrefs
         query = replace(query, offset=prompts[-1].offset)
         if not query.offset:
             break
     return result
+
+
+def get_error_response(status_code: int, details: dict | str = None):
+    """Return JSON for API errors, including requests with no matched route."""
+    status = HTTPStatus(status_code)
+    return JSONResponse(status_code=status_code, content={
+        "code": status_code,
+        "title": status.phrase,
+        "message": status.description,
+        "details": details,
+    })
 
 
 def drop_cdn_cache(user: User) -> tuple[bool, int]:
@@ -249,6 +247,7 @@ def generate_sitemap(user: User, req) -> tuple[int, str]:
     urls.extend([
         (url("index"), today),
         (url("tags"), today),
+        (url("categories"), today),
         (url("contacts"), today),
         (url("rules"), today),
         (url("terms"), today),
@@ -256,14 +255,26 @@ def generate_sitemap(user: User, req) -> tuple[int, str]:
     ])
 
     # Prompt lists
-    def prompts_url(tp: PromptQueryType, tg: Tag | None = None) -> str:
-        return get_prompts_url(req, type=tp, tags=[tg.slug] if tg else [], absolute=True)
+    def prompts_url(tp: PromptQueryType, tg: Tag | None = None,
+                    category: Category | None = None) -> str:
+        return get_prompts_url(
+            req,
+            type=tp,
+            tags=[tg.slug] if tg else [],
+            category=category.slug if category else None,
+            absolute=True,
+        )
 
+    sitemap_tags = get_tags(TagQueryDTO(limit=1000))
+    sitemap_categories = get_categories()
     for type_ in PromptQueryType:
         urls.append((prompts_url(type_), today))
-        for tag in get_tags(TagQueryDTO(limit=1000)):
+        for tag in sitemap_tags:
             if tag.prompts_count > 0:
                 urls.append((prompts_url(type_, tag), today))
+        for category in sitemap_categories:
+            if category.published_prompts_count > 0:
+                urls.append((prompts_url(type_, category=category), today))
 
     # Prompts
     def prompt_url(prompt: Prompt) -> str:
@@ -357,8 +368,7 @@ def delete_tag_subscription(tag_subscription_id: str, user: User) -> TagSubscrip
     return subscription
 
 
-def update_tag(tag: Tag, update_tag_dto: UpdateTagDTO, cur_user: User,
-                       req) -> None:
+def update_tag(tag: Tag, update_tag_dto: UpdateTagDTO, cur_user: User) -> None:
     verify_authorization(cur_user, Permission.UPDATE_TAG, tag)
 
     if cur_user.status == UserStatus.BANNED:
@@ -439,6 +449,42 @@ def update_tag(tag: Tag, update_tag_dto: UpdateTagDTO, cur_user: User,
         drop_public_file(old_image)
 
 
+def update_category(category: Category, dto: UpdateCategoryDTO, cur_user: User) -> None:
+    verify_authorization(cur_user, Permission.UPDATE_CATEGORY)
+    if cur_user.status == UserStatus.BANNED:
+        raise UserBannedError()
+
+    changes = dto.get_changes(category)
+    image_action = changes.pop("image_action", "keep")
+    if image_action == "delete":
+        changes["image_filename"] = None
+    elif image_action == "keep":
+        changes.pop("image_filename", None)
+    if not changes:
+        return
+
+    old_image = category.image_filename
+    now = utc_now()
+    base = PromptCategory(category.slug)
+    existing = get_dynamodb_item(f"CATEGORY#{category.slug}", "META")
+    changes = {
+        "category_slug": category.slug,
+        "name": base.label,
+        "description": category.description,
+        "created_at": (existing or {}).get("created_at", now),
+        **({"published_prompts_count": category.published_prompts_count} if not existing else {}),
+        **changes,
+    }
+    transacts = []
+    add_dynamodb_update_transact(transacts, (f"CATEGORY#{category.slug}", "META"), changes)
+    dynamodb_transact_write(transacts)
+    for key, value in changes.items():
+        if hasattr(category, key):
+            setattr(category, key, value)
+    if old_image and image_action in {"delete", "replace"}:
+        drop_public_file(old_image)
+
+
 def save_public_file(file_dto: FileDTO, filename: str = None) -> str:
     if not filename:
         file_ext = file_dto.extension
@@ -484,7 +530,8 @@ def drop_public_file(filename: str) -> None:
     get_s3_client().delete_object(Bucket=get_static_s3_bucket(), Key=filename)
 
 
-def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
+def create_prompt(prompt_dto: PromptDTO, cur_user: User, *,
+                  source: dict | None = None, slug_scope_prechecked: bool = False) -> Prompt:
     verify_authorization(cur_user, Permission.CREATE_PROMPT)
 
     if cur_user.status == UserStatus.BANNED:
@@ -498,10 +545,11 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
     category = prompt_dto.category
     outputs = prompt_dto.outputs
     template = prompt_dto.template
-    validate_prompt_template_links(template)
-    image_filenames = prompt_dto.image_filenames
+    validate_prompt_template_links(template["content"])
     tags = sanitize_tags(prompt_dto.tags)
     slug = to_kebab_case(title)
+    if not slug_scope_prechecked and find_prompt_by_slug_follow_redirects(cur_user.id, slug):
+        raise SlugDuplicationError(field="title")
 
     transacts = []
 
@@ -511,23 +559,24 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
         "description": description,
         "category": category,
         "outputs": outputs,
+        "inputs": prompt_dto.inputs,
         "prompt_slug": slug,
         "user_id": cur_user.id,
         "user_name": cur_user.name,
         "template": template,
-        "image_filenames": image_filenames,
+        "params": extract_template_params(template["content"]),
+        "result_files": prompt_dto.result_files,
         "tags": tags,
         "rating_sk": compute_rating_sk(0, now),
         "status": status,
         "created_at": now,
         "prompt_status_pk": f"PROMPT#{status}",
         "prompt_user_status_pk": f"PROMPT#{cur_user.id}#{status}",
+        "prompt_category_status_pk": f"PROMPT#{category}#{status}",
     }
-    models = [get_prompt_model(model_slug) for model_slug in prompt_dto.models]
-    prompt_item["models"] = [
-        {"title": model.title, "slug": model.slug, "version": model.version}
-        for model in models if model
-    ]
+    if source is not None:
+        prompt_item["source"] = source
+    prompt_item["models"] = prompt_dto.models
     if cur_user.username:
         prompt_item["user_slug"] = cur_user.username
     add_dynamodb_put_transact(transacts, (f"PROMPT#{prompt_id}", "META"), prompt_item, new_pk_only=True)
@@ -537,8 +586,12 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
     add_dynamodb_user_update_transact(transacts, cur_user, deltas={
         "unpublished_prompts_count": 1,
     })
-    # todo: should be unique in combination with username (cur_user, prompt)
-    add_dynamodb_put_transact(transacts, (f"PROMPT_SLUG#{slug}", "META"), {"prompt_id": prompt_id}, new_pk_only=True)
+    add_dynamodb_put_transact(
+        transacts,
+        (f"PROMPT_SLUG#{cur_user.id}#{slug}", "META"),
+        {"prompt_id": prompt_id},
+        new_pk_only=True,
+    )
 
     try:
         dynamodb_transact_write(transacts)
@@ -551,24 +604,27 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User) -> Prompt:
     return prompt_from_dynamodb(prompt_item)
 
 
-def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: User, req) -> None:
+def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: User, req, *,
+                  refresh_params: bool = False) -> None:
     verify_authorization(cur_user, Permission.UPDATE_PROMPT, prompt)
 
     if cur_user.status == UserStatus.BANNED:
         raise UserBannedError()
 
     changes = update_prompt_dto.get_changes(prompt)
-    if not changes:
+    if not changes and not refresh_params:
         return
 
     if "models" in changes:
-        changes["models"] = [
-            {"title": model.title, "slug": model.slug, "version": model.version}
-            for model_slug in changes["models"]
-            if (model := get_prompt_model(model_slug))
-        ]
+        changes["models"] = list(changes["models"])
 
-    validate_prompt_template_links(changes.get("template", prompt.template))
+    effective_template = changes.get("template", prompt.template)
+    validate_prompt_template_links(effective_template["content"])
+    # Parameters are derived server-side so stored metadata can never be
+    # supplied independently of the template. This also backfills old records
+    # the next time they are updated.
+    changes["params"] = extract_template_params(effective_template["content"])
+
     if "tags" in changes:
         changes["tags"] = sanitize_tags(changes["tags"])
     old_status = prompt.status
@@ -585,17 +641,26 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
         old_slug = prompt.slug
         slug = to_kebab_case(new_title)
         if old_slug != slug:
+            if find_prompt_by_slug_follow_redirects(prompt.owner_id, slug):
+                raise SlugDuplicationError(field="title")
             changes["prompt_slug"] = slug
-            # Create redirect item so old slug resolves
-            redirect_item = {
-                "prompt_slug": old_slug,
-                "redirect_to": slug,
-                "created_at": now
-            }
-            add_dynamodb_put_transact(transacts, (f"PROMPT_REDIRECT#{old_slug}", "META"), redirect_item, new_pk_only=True)
-            # Create new slug lock
-            add_dynamodb_put_transact(transacts, (f"PROMPT_SLUG#{slug}", "META"), {"prompt_id": prompt.id},
-                                      new_pk_only=True)
+            # Keep the old owner-scoped lock pointing at this prompt so old
+            # URLs resolve to its current canonical URL.
+            add_dynamodb_put_transact(
+                transacts,
+                (f"PROMPT_SLUG#{prompt.owner_id}#{old_slug}", "META"),
+                {"prompt_id": prompt.id},
+            )
+            add_dynamodb_put_transact(
+                transacts,
+                (f"PROMPT_SLUG#{prompt.owner_id}#{slug}", "META"),
+                {"prompt_id": prompt.id},
+                new_pk_only=True,
+            )
+
+    category_changed = "category" in changes and changes["category"] != prompt.category
+    if published_already and category_changed:
+        changes["status"] = PromptStatus.UNPUBLISHED
 
     old_tags = list(prompt.tags)
     tags_changed = False
@@ -629,6 +694,14 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
         # User prompt counters
         prompt_owner_deltas[f"{old_status}_prompts_count"] = -1
         prompt_owner_deltas[f"{status}_prompts_count"] = 1
+    if status_changed or "category" in changes:
+        changes["prompt_category_status_pk"] = f"PROMPT#{changes.get('category', prompt.category)}#{status}"
+
+    crossed_published_boundary = (old_status == PromptStatus.PUBLISHED) != (status == PromptStatus.PUBLISHED)
+    if crossed_published_boundary:
+        add_update_category_published_count_transact(
+            transacts, prompt.category, 1 if status == PromptStatus.PUBLISHED else -1, now
+        )
 
     add_dynamodb_user_update_transact(transacts, prompt_owner, deltas=prompt_owner_deltas)
     add_dynamodb_prompt_update_transact(transacts, prompt, changes)
@@ -650,13 +723,13 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
             setattr(prompt, k, v)
     if "models" in changes:
         prompt.models = [
-            model for model_data_item in changes["models"]
-            if (model := get_prompt_model(model_data_item["slug"], model_data_item["version"]))
+            model for model_slug in changes["models"]
+            if (model := get_prompt_model(model_slug))
         ]
 
 
 def create_prompt_comment(prompt: Prompt, prompt_comment_dto: PromptCommentDTO, cur_user: User,
-                           req) -> PromptComment:
+                          req) -> PromptComment:
     verify_authorization(cur_user, Permission.CREATE_PROMPT_COMMENT)
 
     if cur_user.status == UserStatus.BANNED:
@@ -709,8 +782,8 @@ def create_prompt_comment(prompt: Prompt, prompt_comment_dto: PromptCommentDTO, 
 
 
 def update_prompt_comment(prompt: Prompt, prompt_comment: PromptComment,
-                           update_prompt_comment_dto: UpdatePromptCommentDTO,
-                           cur_user: User, req) -> None:
+                          update_prompt_comment_dto: UpdatePromptCommentDTO,
+                          cur_user: User, req) -> None:
     verify_authorization(cur_user, Permission.UPDATE_PROMPT_COMMENT, prompt_comment)
 
     if cur_user.status == UserStatus.BANNED:
@@ -892,7 +965,7 @@ def update_user_status(user: User, update_user_status_dto: UpdateUserStatusDTO, 
 
 
 def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptStatusDTO, cur_user: User,
-                          req) -> None:
+                         req, *, dispatch_event: bool = True) -> None:
     # logger.debug(f"update_prompt_status: prompt: {prompt}, cur_user: {cur_user}")
     verify_authorization(cur_user, Permission.UPDATE_PROMPT_STATUS)
 
@@ -930,12 +1003,15 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
 
         add_increase_tags_rating_transact(transacts, prompt.tags, now)
         add_put_tag_combos_transact(transacts, prompt)
+        add_update_category_published_count_transact(transacts, prompt.category, 1, now)
     elif crossed_published_boundary:
         add_decrease_tags_rating_transact(transacts, prompt.tags, now)
         add_delete_tag_combos_transact(transacts, prompt)
+        add_update_category_published_count_transact(transacts, prompt.category, -1, now)
 
     changes["prompt_status_pk"] = f"PROMPT#{status}"
     changes["prompt_user_status_pk"] = f"PROMPT#{prompt.user_id}#{status}"
+    changes["prompt_category_status_pk"] = f"PROMPT#{prompt.category}#{status}"
 
     add_dynamodb_prompt_update_transact(transacts, prompt, changes)
 
@@ -947,7 +1023,7 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
     dynamodb_transact_write(transacts)
 
     logger.info("Prompt status changed", extra={"context": {"prompt_id": prompt.id, "status": status}})
-    if status == PromptStatus.PUBLISHED:
+    if status == PromptStatus.PUBLISHED and dispatch_event:
         try:
             dispatch_prompt_published_event(prompt)
         except Exception:
@@ -1004,8 +1080,8 @@ def create_contact_message(message_dto: ContactMessageDTO, user: User = None) ->
 
 
 def update_prompt_impression(prompt: Prompt, update_prompt_impression_dto: UpdatePromptImpressionDTO,
-                              cur_user: User,
-                              req) -> None:
+                             cur_user: User,
+                             req) -> None:
     verify_authorization(cur_user, Permission.UPDATE_PROMPT_IMPRESSION, prompt)
 
     if cur_user.status == UserStatus.BANNED:

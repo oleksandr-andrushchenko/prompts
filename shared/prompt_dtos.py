@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
+from urllib.parse import urlsplit
 
 from basic_dtos import BaseDTO, UNSET
-from prompt_models import PromptCategory, PromptOutput
+from prompt_models import PromptCategory, get_prompt_model
+from prompt_contracts import validate_template, validate_ports
 from query_dtos import PromptStatus
 
 
@@ -19,14 +21,14 @@ def _validate_tags(values):
 
 
 def _validate_title(value):
-    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 140:
-        raise ValueError("title must contain between 1 and 140 characters")
+    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 200:
+        raise ValueError("title must contain between 1 and 200 characters")
     return value.strip()
 
 
 def _validate_description(value):
-    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 400:
-        raise ValueError("description must contain between 1 and 400 characters")
+    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 500:
+        raise ValueError("description must contain between 1 and 500 characters")
     return value.strip()
 
 
@@ -37,51 +39,17 @@ def _validate_category(value):
         raise ValueError(f"unsupported prompt category: {value}") from None
 
 
-def _validate_outputs(values):
-    if isinstance(values, str):
-        values = [value.strip() for value in values.split(",") if value.strip()]
-    result = list(dict.fromkeys(values or []))
-    try:
-        result = [PromptOutput(value).value for value in result]
-    except (TypeError, ValueError):
-        raise ValueError("outputs must contain only text, image, or video") from None
-    if not result:
-        raise ValueError("outputs must contain at least one output type")
-    return result
-
-
-
-def _validate_template(value):
-    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 100_000:
-        raise ValueError("template must contain between 1 and 100000 characters")
-    return value.strip()
-
-
 def _validate_models(values):
-    from prompt_models import get_prompt_model
     if isinstance(values, str):
         values = [value.strip() for value in values.split(",") if value.strip()]
     result = list(dict.fromkeys(values or []))
-    if not result:
-        raise ValueError("at least one model is required")
     models = []
     for value in result:
         model = get_prompt_model(value)
         if model is None:
             raise ValueError(f"unsupported prompt model: {value}")
-        models.append(model.slug)
+        models.append(model.value)
     return models
-
-
-def _validate_image_filenames(values):
-    if isinstance(values, str):
-        values = [value.strip() for value in values.split(",") if value.strip()]
-    values = list(values or [])
-    if len(values) > 8:
-        raise ValueError("image_filenames must contain at most 8 items")
-    if any(not isinstance(value, str) or not value.strip() for value in values):
-        raise ValueError("image filenames must be non-empty filenames")
-    return list(dict.fromkeys(value.strip() for value in values))
 
 
 def _validate_comment_text(value):
@@ -89,26 +57,49 @@ def _validate_comment_text(value):
         raise ValueError("text must contain between 1 and 5000 characters")
 
 
+def _validate_result_files(values):
+    if not isinstance(values, list):
+        raise ValueError("result_files must be a list")
+    result = []
+    for item in values:
+        if not isinstance(item, dict) or set(item) != {"filename", "format"}:
+            raise ValueError("each result file requires filename and format")
+        filename = item["filename"]
+        image_url = (isinstance(filename, str) and item['format'] == 'image'
+                     and urlsplit(filename).scheme in ('http', 'https') and bool(urlsplit(filename).netloc))
+        if not image_url and (not isinstance(filename, str) or not filename or len(filename) > 255
+                or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in filename)
+                or filename.startswith(".")):
+            raise ValueError("result filename must be a local asset filename")
+        if item["format"] not in ("image", "video", "audio", "text"):
+            raise ValueError("result file format must be image, video, audio, or text")
+        if item not in result:
+            result.append(dict(item))
+    return result
+
+
 @dataclass(slots=True)
 class PromptDTO(BaseDTO):
     title: str
     description: str
     category: str
-    outputs: list[str]
-    template: str
+    outputs: list[dict]
+    template: dict
     tags: list[str]
     models: list[str]
-    image_filenames: list[str] = field(default_factory=list)
+    result_files: list[dict[str, str]] = field(default_factory=list)
+    inputs: list[dict] = field(default_factory=list)
 
     def __post_init__(self):
         self.title = _validate_title(self.title)
         self.description = _validate_description(self.description)
         self.category = _validate_category(self.category)
-        self.outputs = _validate_outputs(self.outputs)
-        self.template = _validate_template(self.template)
+        self.template = validate_template(self.template)
+        self.inputs = validate_ports(self.inputs, inputs=True)
+        self.outputs = validate_ports(self.outputs)
         self.tags = _validate_tags(self.tags)
         self.models = _validate_models(self.models)
-        self.image_filenames = _validate_image_filenames(self.image_filenames)
+        self.result_files = _validate_result_files(self.result_files)
 
 
 @dataclass(slots=True)
@@ -116,35 +107,38 @@ class UpdatePromptDTO(BaseDTO):
     title: str | None | object = UNSET
     description: str | None | object = UNSET
     category: str | None | object = UNSET
-    outputs: list[str] | object = UNSET
+    outputs: list[dict] | object = UNSET
+    inputs: list[dict] | object = UNSET
     tags: list[str] | None | object = UNSET
-    template: str | object = UNSET
-    image_filenames: list[str] | object = UNSET
+    template: dict | object = UNSET
+    result_files: list[dict[str, str]] | object = UNSET
     models: list[str] | object = UNSET
 
     def __post_init__(self):
         if self.title is not UNSET:
             if self.title is None:
-                raise ValueError("title must contain between 1 and 140 characters")
+                raise ValueError("title must contain between 1 and 200 characters")
             self.title = _validate_title(self.title)
         if self.description is not UNSET:
             if self.description is None:
-                raise ValueError("description must contain between 1 and 400 characters")
+                raise ValueError("description must contain between 1 and 500 characters")
             self.description = _validate_description(self.description)
         if self.category is not UNSET:
             if self.category is None:
                 raise ValueError("category is required")
             self.category = _validate_category(self.category)
+        if self.inputs is not UNSET:
+            self.inputs = validate_ports(self.inputs, inputs=True)
         if self.outputs is not UNSET:
-            self.outputs = _validate_outputs(self.outputs)
+            self.outputs = validate_ports(self.outputs)
         if self.tags is not UNSET:
             self.tags = _validate_tags(self.tags)
         if self.template is not UNSET:
-            self.template = _validate_template(self.template)
+            self.template = validate_template(self.template)
         if self.models is not UNSET:
             self.models = _validate_models(self.models)
-        if self.image_filenames is not UNSET:
-            self.image_filenames = _validate_image_filenames(self.image_filenames)
+        if self.result_files is not UNSET:
+            self.result_files = _validate_result_files(self.result_files)
 
 
 @dataclass(slots=True)

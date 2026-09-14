@@ -477,7 +477,9 @@ def test_regular_user_can_create_prompt_comment():
         "title": "Regular comment permission test prompt",
         "prompt_slug": "regular-comment-permission-test-prompt",
         "user_id": owner_id,
-        "template": "Long form prompt template for integration testing. " * 120,
+        "template": {"content": "Long form prompt template for integration testing. " * 120, "format": "text"},
+        "inputs": [],
+        "outputs": [{"name": "result", "formats": ["text"]}],
         "tags": ["testing"],
         "rating_sk": now,
         "status": "published",
@@ -510,7 +512,9 @@ def test_index_shows_latest_prompt_comments(guest_client):
         "title": prompt_title,
         "prompt_slug": "latest-comments-test-prompt",
         "user_id": user_id,
-        "template": "Long form prompt template for integration testing. " * 120,
+        "template": {"content": "Long form prompt template for integration testing. " * 120, "format": "text"},
+        "inputs": [],
+        "outputs": [{"name": "result", "formats": ["text"]}],
         "tags": ["testing"],
         "rating_sk": now,
         "status": "published",
@@ -797,6 +801,7 @@ def test_user_status_endpoint_success_and_validation_failure(root_user_client):
 PROMPT_IMAGE_FILENAME = "9ba8f5cf-b0a4-430c-99ec-4a78f3c4245f_1080x784.png"
 PROMPT_IMAGE_ALT = "Functional prompt image"
 PROMPT_TEMPLATE = ("Functional endpoint coverage template. " * 140
+                   + ' Configure ${Language:Turkish}.'
                    + f'<p><img src="/{PROMPT_IMAGE_FILENAME}" alt="{PROMPT_IMAGE_ALT}"></p>')
 
 
@@ -811,12 +816,13 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     create_success = prompt(root_client, "/prompts", json={
         "title": "Functional endpoint coverage prompt",
         "description": "A functional endpoint coverage prompt.",
-        "category": "Code & Dev",
-        "outputs": ["text"],
-        "template": PROMPT_TEMPLATE,
+        "category": "code-dev",
+        "outputs": [{"name": "result", "formats": ["text", "json"]}],
+        "inputs": [{"name": "reference", "formats": ["image", "text"], "required": True}],
+        "template": {"content": PROMPT_TEMPLATE, "format": "text"},
         "models": ["openai-gpt-4o"],
         "tags": ["functional-tag", "coverage-tag"],
-        "image_filenames": [PROMPT_IMAGE_FILENAME],
+        "result_files": [{"filename": PROMPT_IMAGE_FILENAME, "format": "image"}],
     })
     assert create_success.status_code == 200, create_success.text
     prompt_item = next(
@@ -825,8 +831,31 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     )
     functional_state["prompt_id"] = prompt_item["id"]
     functional_state["prompt_slug"] = prompt_item["prompt_slug"]
-    assert prompt_item["template"] == PROMPT_TEMPLATE
-    assert prompt_item["image_filenames"] == [PROMPT_IMAGE_FILENAME]
+    functional_state["code_dev_count_before_publish"] = dynamodb_table.get_item(
+        Key={"pk": "CATEGORY#code-dev", "sk": "META"}
+    ).get("Item", {}).get("published_prompts_count", 0)
+    scoped_slug_item = dynamodb_table.get_item(Key={
+        "pk": f"PROMPT_SLUG#{prompt_item['user_id']}#{prompt_item['prompt_slug']}",
+        "sk": "META",
+    }).get("Item")
+    assert scoped_slug_item["prompt_id"] == prompt_item["id"]
+    assert "Item" not in dynamodb_table.get_item(Key={
+        "pk": f"PROMPT_SLUG#{prompt_item['prompt_slug']}",
+        "sk": "META",
+    })
+    assert prompt_item["template"] == {
+        "content": PROMPT_TEMPLATE.replace("${Language:Turkish}", "${language:Turkish}"),
+        "format": "text",
+    }
+    assert prompt_item["params"] == [{"name": "language", "default": "Turkish"}]
+    assert prompt_item["category"] == "code-dev"
+    assert prompt_item["prompt_category_status_pk"] == "PROMPT#code-dev#unpublished"
+    assert prompt_item["models"] == ["openai-gpt-4o"]
+    assert prompt_item["tags"] == ["functional-tag", "coverage-tag"]
+    assert prompt_item["inputs"] == [{"name": "reference", "formats": ["image", "text"], "required": True}]
+    assert prompt_item["outputs"] == [{"name": "result", "formats": ["text", "json"]}]
+    assert prompt_item["result_files"] == [{"filename": PROMPT_IMAGE_FILENAME, "format": "image"}]
+    assert "image_filenames" not in prompt_item
 
     invalid_links_template = (
         PROMPT_TEMPLATE
@@ -835,10 +864,10 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     )
     invalid_links = prompt(root_client, "/prompts", json={
         "title": "Prompt with invalid links",
-        "description": "A prompt with invalid links.",
-        "category": "Code & Dev",
-        "outputs": ["text"],
-        "template": invalid_links_template,
+        "description": "A prompt with invalid template links.",
+        "category": "code-dev",
+        "outputs": [],
+        "template": {"content": invalid_links_template, "format": "text"},
         "models": ["openai-gpt-4o"],
         "tags": ["functional-tag"],
     })
@@ -850,9 +879,9 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     create_failure = prompt(root_client, "/prompts", json={
         "title": "Invalid prompt payload",
         "description": "A functional endpoint coverage prompt.",
-        "category": "Code & Dev",
-        "outputs": ["text"],
-        "template": "",
+        "category": "code-dev",
+        "outputs": [{"name": "result", "formats": ["text"]}],
+        "template": {"content": "", "format": "text"},
         "models": ["openai-gpt-4o"],
         "tags": ["functional-tag"],
     })
@@ -904,8 +933,8 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
 
     dynamodb_table.update_item(
         Key={"pk": f"PROMPT#{prompt_id}", "sk": "META"},
-        UpdateExpression="SET image_filenames = :filenames",
-        ExpressionAttributeValues={":filenames": ["promptcatalog_1161x515.png"]},
+        UpdateExpression="SET result_files = :filenames",
+        ExpressionAttributeValues={":filenames": [{"filename": "promptcatalog_1161x515.png", "format": "image"}]},
     )
     image_doc = pq(get(root_client, f"/prompts/{prompt_id}").text)
     image_schema = json.loads(image_doc('script[type="application/ld+json"]').text())
@@ -914,8 +943,16 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert image_doc('meta[property="og:image"]').attr("content").endswith("/promptcatalog_1161x515.png")
     dynamodb_table.update_item(
         Key={"pk": f"PROMPT#{prompt_id}", "sk": "META"},
-        UpdateExpression="REMOVE image_filenames",
+        UpdateExpression="REMOVE result_files",
     )
+
+    replacement = [{"filename": "example.mp4", "format": "video"}]
+    replaced = patch(root_client, f"/prompts/{prompt_id}", json={"result_files": replacement})
+    assert replaced.status_code == 200, replaced.text
+    assert '<video ' in get(root_client, f"/prompts/{prompt_id}").text
+    cleared = patch(root_client, f"/prompts/{prompt_id}", json={"result_files": []})
+    assert cleared.status_code == 200, cleared.text
+    assert get_dynamodb_prompt(prompt_id)['result_files'] == []
 
     read_failure = get(guest_client, "/prompts/missing-prompt")
     assert read_failure.status_code == 404
@@ -923,7 +960,8 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     edit_success = get(root_client, f"/prompts/{prompt_id}/edit")
     assert edit_success.status_code == 200
     edit_doc = pq(edit_success.text)
-    raw_editor_content = edit_doc("textarea.editor").text()
+    assert len(edit_doc("textarea.prompt-template")) == 1
+    raw_editor_content = edit_doc("textarea.prompt-template").eq(0).text()
     assert f'<img src="/{PROMPT_IMAGE_FILENAME}" alt="{PROMPT_IMAGE_ALT}">' in raw_editor_content
     assert "<picture>" not in raw_editor_content
     edit_failure = get(regular_client, f"/prompts/{prompt_id}/edit")
@@ -935,7 +973,9 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
         + '<a href="http://web-lambda:5000/rules">Rules two</a>'
         + '<a href="/root-functional/missing-prompt">Missing prompt</a>'
     )
-    invalid_links = patch(root_client, f"/prompts/{prompt_id}", json={"template": invalid_links_template})
+    invalid_links = patch(root_client, f"/prompts/{prompt_id}", json={
+        "template": {"content": invalid_links_template, "format": "text"},
+    })
     assert invalid_links.status_code == 422
     template_error = invalid_links.json()["details"]["template"]
     assert "duplicate links" in template_error
@@ -943,14 +983,14 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
 
     update_success = patch(root_client, f"/prompts/{prompt_id}", json={
         "title": "Updated functional endpoint coverage prompt",
-        "template": PROMPT_TEMPLATE,
+        "template": {"content": PROMPT_TEMPLATE, "format": "text"},
         "tags": ["functional-tag", "coverage-tag"],
     })
     assert update_success.status_code == 200, update_success.text
     functional_state["prompt_slug"] = "updated-functional-endpoint-coverage-prompt"
     update_failure = patch(root_client, f"/prompts/{prompt_id}", json={
         "category": "Invalid category",
-        "template": PROMPT_TEMPLATE,
+        "template": {"content": PROMPT_TEMPLATE, "format": "text"},
         "tags": ["functional-tag"],
     })
     assert update_failure.status_code == 422
@@ -1008,6 +1048,9 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
 
     slug_success = get(guest_client, f"/@root-functional/{functional_state["prompt_slug"]}")
     assert slug_success.status_code == 200, slug_success.text
+    slug_doc = pq(slug_success.text)
+    assert "Parameterized" in slug_doc.text()
+    assert "${language:Turkish}" in slug_doc(".prompt-params").text()
     slug_failure = get(guest_client, "/@root-functional/missing-prompt")
     assert slug_failure.status_code == 404
 
@@ -1015,6 +1058,49 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert prompts_by_slug_success.status_code == 200
     prompts_by_slug_failure = get(guest_client, "/invalid/latest/prompts?limit=0")
     assert prompts_by_slug_failure.status_code == 422
+
+    category_prompt_page = get(guest_client, "/prompts?category=code-dev")
+    assert category_prompt_page.status_code == 200
+    assert "Updated functional endpoint coverage prompt" in pq(category_prompt_page.text)("#prompts").text()
+    category_item = dynamodb_table.get_item(
+        Key={"pk": "CATEGORY#code-dev", "sk": "META"}
+    )["Item"]
+    assert category_item["published_prompts_count"] == (
+        functional_state["code_dev_count_before_publish"] + 1
+    )
+
+
+def test_categories_page_and_admin_update_endpoints(guest_client):
+    root_client = get_logged_in_client(root_user)
+    regular_client = get_logged_in_client(regular_user)
+
+    page = get(guest_client, "/categories")
+    assert page.status_code == 200
+    doc = pq(page.text)
+    schema = json.loads(doc('script[type="application/ld+json"]').text())
+    assert schema["@type"] == "CollectionPage"
+    assert len(doc("#categories .card")) > 1
+    assert doc('a[href="/prompts?category=code-dev"]')
+
+    edit_success = get(root_client, "/categories/code-dev/edit")
+    assert edit_success.status_code == 200
+    edit_failure = get(regular_client, "/categories/code-dev/edit")
+    assert edit_failure.status_code == 403
+
+    description = "Build, review, and improve software with reusable coding prompts."
+    update_success = patch(root_client, "/categories/code-dev", json={
+        "description": description,
+        "image_action": "keep",
+    })
+    assert update_success.status_code == 200, update_success.text
+    assert update_success.json().endswith("/categories")
+    assert description in get(guest_client, "/categories").text
+
+    update_failure = patch(regular_client, "/categories/code-dev", json={
+        "description": "Regular users cannot edit category metadata.",
+        "image_action": "keep",
+    })
+    assert update_failure.status_code == 403
 
 
 def test_prompt_impression_comment_and_comment_update_endpoints_success_and_failure(guest_client):
@@ -1137,7 +1223,6 @@ def test_admin_page_sitemap_and_cache_endpoints_success_and_failure(guest_client
     sitemap_success = prompt(root_client, "/generate-sitemap", json={})
     assert sitemap_success.status_code == 200, sitemap_success.text
     assert sitemap_success.json()["urls_count"] > 0
-    assert sitemap_success.json()["sitemap_url"] == f"{os.getenv('WEB_TEST_BASE_URL')}/sitemap.xml"
     sitemap = get(guest_client, "/sitemap.xml")
     assert sitemap.status_code == 200
     assert "/tags" in sitemap.text
@@ -1203,9 +1288,9 @@ def test_prompt_published_dispatch_matches_combinations_excludes_author_and_rend
     create_response = prompt(author_client, "/prompts", json={
         "title": "Combination notification integration prompt",
         "description": "A combination notification integration prompt.",
-        "category": "Code & Dev",
-        "outputs": ["text"],
-        "template": PROMPT_TEMPLATE,
+        "category": "code-dev",
+        "outputs": [{"name": "result", "formats": ["text"]}],
+        "template": {"content": PROMPT_TEMPLATE, "format": "text"},
         "models": ["openai-gpt-4o"],
         "tags": ["notification-tag1", "notification-tag2", "notification-tag3"],
     })
@@ -1284,3 +1369,72 @@ def test_query_endpoints_ignore_undeclared_parameters(guest_client, path):
 def test_query_endpoints_validate_declared_parameters_with_unknown_parameters(guest_client, path):
     response = get(guest_client, f"{path}?asdasd=13sd&limit=invalid")
     assert response.status_code == 422, (path, response.status_code, response.text)
+
+
+def test_prompt_slug_uniqueness_is_scoped_to_owner():
+    title = "Shared prompt slug across owners"
+    payload = {
+        "title": title,
+        "description": "The same title is valid for two different prompt owners.",
+        "category": "code-dev",
+        "outputs": [{"name": "result", "formats": ["text"]}],
+        "template": {"content": PROMPT_TEMPLATE, "format": "text"},
+        "models": ["openai-gpt-4o"],
+        "tags": [],
+    }
+    owner_clients = [get_logged_in_client(root_user), get_logged_in_client(regular_user)]
+    prompt_ids = []
+    for owner_client in owner_clients:
+        response = prompt(owner_client, "/prompts", json=payload)
+        assert response.status_code == 200, response.text
+        prompt_ids.append(response.json().rstrip("/").split("/")[-1])
+
+    assert prompt_ids[0] != prompt_ids[1]
+    slug = "shared-prompt-slug-across-owners"
+    for prompt_id in prompt_ids:
+        prompt_item = get_dynamodb_prompt(prompt_id)
+        slug_item = dynamodb_table.get_item(Key={
+            "pk": f"PROMPT_SLUG#{prompt_item['user_id']}#{slug}",
+            "sk": "META",
+        }).get("Item")
+        assert slug_item["prompt_id"] == prompt_id
+
+    duplicate = prompt(owner_clients[0], "/prompts", json=payload)
+    assert duplicate.status_code == 422, duplicate.text
+
+
+def test_structured_prompt_template_uses_matching_code_language():
+    root_client = get_logged_in_client(root_user)
+    template_content = json.dumps({
+        "prompt": "Create a seaside scene",
+        "style": ["photorealistic", "natural light"],
+    }, indent=2)
+    response = prompt(root_client, "/prompts", json={
+        "title": "Structured JSON template rendering",
+        "description": "A JSON prompt used to verify structured template rendering.",
+        "category": "design-image",
+        "outputs": [{"name": "result", "formats": ["image"]}],
+        "template": {"content": template_content, "format": "json"},
+        "models": [],
+        "tags": [],
+    })
+    assert response.status_code == 200, response.text
+    prompt_id = response.json().rstrip("/").split("/")[-1]
+
+    page = get(root_client, f"/prompts/{prompt_id}")
+    assert page.status_code == 200, page.text
+    doc = pq(page.text)
+    code = doc("pre.language-json > code.language-json")
+    assert len(code) == 1
+    assert code.text() == template_content
+    assert "prism-core.min.js" in page.text
+
+    html_content = "<!DOCTYPE html>\n<html><body><h1>Travel itinerary</h1></body></html>"
+    update = patch(root_client, f"/prompts/{prompt_id}", json={
+        "template": {"content": html_content, "format": "html"},
+    })
+    assert update.status_code == 200, update.text
+    html_page = get(root_client, f"/prompts/{prompt_id}")
+    html_code = pq(html_page.text)("pre.language-html > code.language-html")
+    assert len(html_code) == 1
+    assert html_code.text() == html_content

@@ -12,7 +12,7 @@ import re
 import sys
 import time
 import uuid
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import StrEnum
@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
 
 from api_route_metadata import API_URL_ROUTES
+from prompt_contracts import extract_template_params, normalize_template_params
 from prompt_dtos import (PromptCommentImpressionAction, PromptImpressionAction)
 from tag_subscription_dtos import TagSubscription
 from basic_dtos import UserTokenDTO
@@ -32,7 +33,7 @@ from notifications import configure_telegram_logging
 from query_dtos import (BaseQueryDTO, PromptCommentQueryDTO, PromptQueryDTO, PromptQueryType, PromptStatus,
                         TagQueryDTO, TagQueryType, UserQueryDTO, UserQueryType, UserStatus)
 from user_dtos import UserImpressionAction
-from prompt_models import PROMPT_CATEGORIES, PROMPT_MODELS, PROMPT_OUTPUTS, PromptModel, get_prompt_model
+from prompt_models import PROMPT_CATEGORIES, PROMPT_MODELS, PROMPT_FORMATS, PROMPT_TEMPLATE_FORMATS, PromptCategory, PromptModel, get_prompt_model
 
 
 def Key(*args, **kwargs):
@@ -216,6 +217,15 @@ class Tag:
 
 
 @dataclass(slots=True)
+class Category:
+    name: str
+    slug: str
+    description: str
+    published_prompts_count: int
+    image_filename: str | None
+
+
+@dataclass(slots=True)
 class PromptImpression:
     owner_id: str
     prompt_id: str
@@ -232,7 +242,8 @@ class Prompt:
     title: str
     description: str
     category: str
-    outputs: list[str]
+    outputs: list[dict]
+    inputs: list[dict]
     slug: str
     user_id: str
     user_slug: str | None
@@ -248,8 +259,7 @@ class Prompt:
             })
         return None
 
-    template: str
-    image_filenames: list[str]
+    template: dict
     models: list[PromptModel]
     tags: list[str]
     status: PromptStatus
@@ -264,6 +274,13 @@ class Prompt:
     published_at: int | None
     is_premium: bool | None
     offset: str | None
+    source: dict[str, Any] | None = None
+    result_files: list[dict[str, str]] = field(default_factory=list)
+    params: list[dict[str, str]] = field(default_factory=list)
+
+    @property
+    def category_label(self) -> str:
+        return PromptCategory(self.category).label
 
 
 @dataclass(slots=True)
@@ -299,7 +316,9 @@ class PromptComment:
         return prompt_from_dynamodb({
             "id": self.prompt_id,
             "user_id": self.user_id,
-        "template": "",
+            "template": {"content": "", "format": "text"},
+            "inputs": [],
+            "outputs": [],
             "title": self.prompt_title,
             "prompt_slug": self.prompt_slug,
             "status": PromptStatus.PUBLISHED,
@@ -332,28 +351,29 @@ class Permission(StrEnum):
     ROOT = "root"
     ALL = "*"
 
-    UPDATE_USER = "update_user"
-    UPDATE_USER_STATUS = "update_user_status"
-    UPDATE_USER_IMPRESSION = "update_user_impression"
-    READ_NON_ACTIVE_USER = "read_non_active_user"
+    UPDATE_USER = "update-user"
+    UPDATE_USER_STATUS = "update-user-status"
+    UPDATE_USER_IMPRESSION = "update-user-impression"
+    READ_NON_ACTIVE_USER = "read-non-active-user"
 
-    CREATE_PROMPT = "create_post"
-    UPDATE_PROMPT = "update_post"
-    UPDATE_PROMPT_STATUS = "update_prompt_status"
-    CREATE_CONTACT_MESSAGE = "create_contact_message"
-    UPDATE_PROMPT_IMPRESSION = "toggle_prompt_impression"
-    READ_NON_PUBLISHED_PROMPT = "read_non_published_post"
+    CREATE_PROMPT = "create-post"
+    UPDATE_PROMPT = "update-post"
+    UPDATE_PROMPT_STATUS = "update-prompt-status"
+    CREATE_CONTACT_MESSAGE = "create-contact-message"
+    UPDATE_PROMPT_IMPRESSION = "toggle-prompt-impression"
+    READ_NON_PUBLISHED_PROMPT = "read-non-published-post"
 
-    READ_TAG = "read_tag"
-    UPDATE_TAG = "update_tag"
+    READ_TAG = "read-tag"
+    UPDATE_TAG = "update-tag"
+    UPDATE_CATEGORY = "update-category"
 
-    CREATE_PROMPT_COMMENT = "create_prompt_comment"
-    UPDATE_PROMPT_COMMENT = "update_prompt_comment"
-    READ_NON_PUBLISHED_PROMPT_COMMENT = "read_non_published_prompt_comment"
+    CREATE_PROMPT_COMMENT = "create-prompt-comment"
+    UPDATE_PROMPT_COMMENT = "update-prompt-comment"
+    READ_NON_PUBLISHED_PROMPT_COMMENT = "read-non-published-prompt-comment"
 
     UTILS = "utils"
-    GENERATE_SITEMAP = "generate_sitemap"
-    DROP_CDN_CACHE = "drop_cdn_cache"
+    GENERATE_SITEMAP = "generate-sitemap"
+    DROP_CDN_CACHE = "drop-cdn-cache"
 
 
 class BaseError(Exception):
@@ -406,6 +426,10 @@ class PromptByOldSlugRequestedError(Exception):
 
 
 class TagNotFoundError(BaseError):
+    pass
+
+
+class CategoryNotFoundError(BaseError):
     pass
 
 
@@ -1069,7 +1093,8 @@ def get_jinja2_env():
         "PromptStatus": PromptStatus,
         "PROMPT_MODELS": PROMPT_MODELS,
         "PROMPT_CATEGORIES": PROMPT_CATEGORIES,
-        "PROMPT_OUTPUTS": PROMPT_OUTPUTS,
+        "PROMPT_FORMATS": PROMPT_FORMATS,
+        "PROMPT_TEMPLATE_FORMATS": PROMPT_TEMPLATE_FORMATS,
         "PromptImpressionAction": PromptImpressionAction,
         "UserImpressionAction": UserImpressionAction,
         "PromptQueryType": PromptQueryType,
@@ -1353,29 +1378,32 @@ def get_user_token_by_auth_jwt_token(token: str | None) -> UserTokenDTO | None:
 
 def prompt_from_dynamodb(d_item: dict[str, Any]) -> Prompt:
     owner_id = d_item["user_id"]
-    template = d_item.get("template", "")
-    if isinstance(template, list):
-        template = "\n\n---\n\n".join(template)
-    model_data = d_item.get("models")
-    if model_data is None and d_item.get("model"):
-        model_data = [d_item["model"]]
+    template = dict(d_item["template"])
+    template["content"] = normalize_template_params(template["content"])
+    extracted_params = extract_template_params(template["content"])
+    params = d_item.get("params")
+    if params != extracted_params:
+        params = extracted_params
     models = [
-        model for model_data_item in (model_data or [])
-        if (model := get_prompt_model(model_data_item.get("slug"), model_data_item.get("version")))
+        model for model_slug in d_item.get("models", [])
+        if (model := get_prompt_model(model_slug))
     ]
     return Prompt(
         id=d_item["id"],
         owner_id=owner_id,
         title=d_item["title"],
-        description=d_item.get("description", d_item.get("short_description", "")),
-        category=d_item.get("category", "Other"),
-        outputs=d_item.get("outputs", ["text"]),
+        description=d_item.get("description", ""),
+        category=d_item.get("category", PromptCategory.OTHER.value),
+        outputs=d_item.get("outputs", []),
+        inputs=d_item.get("inputs", []),
         slug=d_item["prompt_slug"],
         user_id=owner_id,
         user_slug=d_item.get("user_slug"),
         user_name=d_item.get("user_name"),
         template=template,
-        image_filenames=d_item.get("image_filenames", []),
+        source=d_item.get("source"),
+        result_files=d_item.get("result_files", []),
+        params=params,
         models=models,
         tags=d_item.get("tags", []),
         status=d_item["status"],
@@ -1544,6 +1572,41 @@ def add_decrease_tags_rating_transact(transacts: list, tags: list, now):
         })
 
 
+def add_update_category_published_count_transact(transacts: list, category_slug: str,
+                                                   delta: int, now: int) -> None:
+    category = PromptCategory(category_slug)
+    default_count = 0 if delta > 0 else 1
+    transacts.append({
+        "Update": {
+            "TableName": get_dynamodb_table_name(),
+            "Key": {"pk": f"CATEGORY#{category.value}", "sk": "META"},
+            "UpdateExpression": (
+                "SET #name = if_not_exists(#name, :name), "
+                "#description = if_not_exists(#description, :description), "
+                "#category_slug = if_not_exists(#category_slug, :category_slug), "
+                "#published_prompts_count = if_not_exists(#published_prompts_count, :default_count) + :delta, "
+                "#created_at = if_not_exists(#created_at, :now), #updated_at = :now"
+            ),
+            "ExpressionAttributeNames": {
+                "#name": "name",
+                "#description": "description",
+                "#category_slug": "category_slug",
+                "#published_prompts_count": "published_prompts_count",
+                "#created_at": "created_at",
+                "#updated_at": "updated_at",
+            },
+            "ExpressionAttributeValues": {
+                ":name": category.label,
+                ":description": category.description,
+                ":category_slug": category.value,
+                ":default_count": default_count,
+                ":delta": delta,
+                ":now": now,
+            },
+        }
+    })
+
+
 def find_prompt(prompt_id: str) -> Prompt | None:
     item = get_dynamodb_item(f"PROMPT#{prompt_id}", "META")
     return prompt_from_dynamodb(item) if item else None
@@ -1560,24 +1623,38 @@ def get_prompt(prompt_id: str, cur_user: User = None) -> Prompt:
     return prompt
 
 
-def find_prompt_slug_item(slug: str) -> dict[str, Any] | None:
+def find_prompt_slug_item(user_id: str, slug: str) -> dict[str, Any] | None:
+    item = get_dynamodb_item(f"PROMPT_SLUG#{user_id}#{slug}", "META")
+    if item:
+        return item
+
+    # Compatibility with prompt records and redirects created before slug
+    # locks were scoped to their owner. This can be removed after those locks
+    # have been migrated.
     resp = query_dynamodb_table(
         index_name="PROMPTS_BY_SLUG",
         key_condition_expr=Key("prompt_slug").eq(slug),
     )
     for item in resp.get("Items", []):
-        if item.get("sk") == "META":
+        if item.get("sk") != "META":
+            continue
+        if item.get("user_id") == user_id and item.get("id"):
+            return {"prompt_id": item["id"]}
+    for item in resp.get("Items", []):
+        if item.get("sk") == "META" and item.get("redirect_to"):
             return item
     return None
 
 
-def find_prompt_by_slug(slug: str) -> Prompt | None:
-    item = find_prompt_slug_item(slug)
-    # logger.debug(f"Prompt by slug: {item}")
-    return prompt_from_dynamodb(item) if item else None
+def find_prompt_by_slug(user_id: str, slug: str) -> Prompt | None:
+    item = find_prompt_slug_item(user_id, slug)
+    if not item or not item.get("prompt_id"):
+        return None
+    prompt = find_prompt(item["prompt_id"])
+    return prompt if prompt and prompt.owner_id == user_id else None
 
 
-def find_prompt_by_slug_follow_redirects(slug: str) -> Prompt | None:
+def find_prompt_by_slug_follow_redirects(user_id: str, slug: str) -> Prompt | None:
     visited = set()
     current_slug = slug
 
@@ -1587,7 +1664,7 @@ def find_prompt_by_slug_follow_redirects(slug: str) -> Prompt | None:
 
         visited.add(current_slug)
 
-        item = find_prompt_slug_item(current_slug)
+        item = find_prompt_slug_item(user_id, current_slug)
         if not item:
             return None
 
@@ -1596,7 +1673,11 @@ def find_prompt_by_slug_follow_redirects(slug: str) -> Prompt | None:
             current_slug = redirect_to
             continue
 
-        return prompt_from_dynamodb(item)
+        prompt_id = item.get("prompt_id")
+        if not prompt_id:
+            return None
+        prompt = find_prompt(prompt_id)
+        return prompt if prompt and prompt.owner_id == user_id else None
 
 
 def find_prompt_comment(prompt_id: str, prompt_comment_id: str) -> PromptComment | None:
@@ -1843,8 +1924,8 @@ def add_dynamodb_delete_transact(
     transacts.append(build_dynamodb_delete_item_params(**param_dict))
 
 
-def get_dynamodb_item(pk: str, sk: str) -> dict[str, Any] | None:
-    resp = get_dynamodb_table().get_item(Key={"pk": pk, "sk": sk})
+def get_dynamodb_item(pk: str, sk: str, *, consistent_read: bool = False) -> dict[str, Any] | None:
+    resp = get_dynamodb_table().get_item(Key={"pk": pk, "sk": sk}, ConsistentRead=consistent_read)
     return resp.get("Item")
 
 
@@ -1931,6 +2012,14 @@ def decode_offset(token: str) -> dict | None:
 def get_prompts(query_dto: PromptQueryDTO = None, cur_user: User = None) -> list[Prompt]:
     if query_dto is None:
         query_dto = PromptQueryDTO()
+    if query_dto.category:
+        prompts = (get_popular_prompts(query_dto, cur_user)
+                   if query_dto.type == PromptQueryType.POPULAR
+                   else get_latest_prompts(query_dto, cur_user))
+        if query_dto.tags:
+            wanted_tags = set(query_dto.tags)
+            prompts = [prompt for prompt in prompts if wanted_tags.issubset(set(prompt.tags))]
+        return prompts
     if query_dto.type == PromptQueryType.POPULAR:
         if query_dto.tags:
             return get_popular_prompts_by_tags(query_dto, cur_user)
@@ -2011,10 +2100,14 @@ def get_latest_prompts(query_dto: PromptQueryDTO = None, cur_user: User = None) 
             raise NotAuthenticatedError()
         verify_authorization(cur_user, Permission.READ_NON_PUBLISHED_PROMPT)
 
+    category_key = (f"PROMPT#{query_dto.category}#{query_dto.status}"
+                    if query_dto.category else None)
     return query_dynamodb_items(
         query_dto=query_dto,
-        index_name="PROMPTS_BY_STATUS_CREATED_AT",
-        key_condition_expr=Key("prompt_status_pk").eq(f"PROMPT#{query_dto.status}"),
+        index_name=("PROMPTS_BY_CATEGORY_STATUS_CREATED_AT" if category_key
+                    else "PROMPTS_BY_STATUS_CREATED_AT"),
+        key_condition_expr=(Key("prompt_category_status_pk").eq(category_key) if category_key
+                            else Key("prompt_status_pk").eq(f"PROMPT#{query_dto.status}")),
         map_fn=prompt_from_dynamodb,
     )
 
@@ -2028,10 +2121,14 @@ def get_popular_prompts(query_dto: PromptQueryDTO = None, cur_user: User = None)
             raise NotAuthenticatedError()
         verify_authorization(cur_user, Permission.READ_NON_PUBLISHED_PROMPT)
 
+    category_key = (f"PROMPT#{query_dto.category}#{query_dto.status}"
+                    if query_dto.category else None)
     return query_dynamodb_items(
         query_dto=query_dto,
-        index_name="PROMPTS_BY_STATUS_RATING",
-        key_condition_expr=Key("prompt_status_pk").eq(f"PROMPT#{query_dto.status}"),
+        index_name=("PROMPTS_BY_CATEGORY_STATUS_RATING" if category_key
+                    else "PROMPTS_BY_STATUS_RATING"),
+        key_condition_expr=(Key("prompt_category_status_pk").eq(category_key) if category_key
+                            else Key("prompt_status_pk").eq(f"PROMPT#{query_dto.status}")),
         map_fn=prompt_from_dynamodb,
     )
 
@@ -2127,6 +2224,46 @@ def tag_from_dynamodb(d_item: dict[str, Any]) -> Tag:
         image_filename=d_item.get("image_filename"),
         offset=None,
     )
+
+
+def category_from_dynamodb(slug: str, d_item: dict[str, Any] | None = None) -> Category:
+    category = PromptCategory(slug)
+    d_item = d_item or {}
+    return Category(
+        name=d_item.get("name") or category.label,
+        slug=category.value,
+        description=d_item.get("description") or category.description,
+        published_prompts_count=d_item.get("published_prompts_count", 0),
+        image_filename=d_item.get("image_filename"),
+    )
+
+
+def find_category(slug: str) -> Category | None:
+    try:
+        category = PromptCategory(slug)
+    except ValueError:
+        return None
+    return category_from_dynamodb(
+        category.value, get_dynamodb_item(f"CATEGORY#{category.value}", "META")
+    )
+
+
+def get_category(slug: str) -> Category:
+    category = find_category(slug)
+    if category is None:
+        raise CategoryNotFoundError(f"Category '{slug}' not found")
+    return category
+
+
+def get_categories() -> list[Category]:
+    table = get_dynamodb_table()
+    keys = [{"pk": f"CATEGORY#{category.value}", "sk": "META"}
+            for category in PROMPT_CATEGORIES]
+    response = table.meta.client.batch_get_item(RequestItems={table.name: {"Keys": keys}})
+    items = response.get("Responses", {}).get(table.name, [])
+    items_by_slug = {item.get("category_slug"): item for item in items}
+    return [category_from_dynamodb(category.value, items_by_slug.get(category.value))
+            for category in PROMPT_CATEGORIES]
 
 
 def get_popular_tags(query_dto: TagQueryDTO = None) -> list[Tag]:

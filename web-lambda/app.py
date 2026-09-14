@@ -15,8 +15,9 @@ from shared_deps import (
     UserDep,
     TagDep,
     TagQueryDep,
+    CategoryDep,
 )
-from shared_utils import get_static_base_url, get_tags, get_web_base_url
+from shared_utils import find_category, get_categories, get_static_base_url, get_tags, get_web_base_url
 from web import (
     Application,
     Request,
@@ -134,7 +135,7 @@ if not is_prod():
                 return FileResponse(file_path)
         return await call_next(request)
 
-
+ 
 @app.middleware("http")
 async def redirect_legacy_static_files(request: Request, call_next):
     path = request.url.path
@@ -352,6 +353,7 @@ async def _prompts_page(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> H
         "prompt_query_tag_items": prompt_query_tag_items,
         "prompts": prompts,
         "tag": tag,
+        "category": find_category(query_dto.category) if query_dto.category else None,
         "tag_subscription": get_user_tag_subscription_for_tags(cur_user,
                                                                                query_dto.tags) if cur_user and query_dto.tags else None,
     })
@@ -379,6 +381,14 @@ async def tags_page(query_dto: TagQueryDep, cur_user: OptCurUserDep) -> str:
         "cur_user": cur_user,
         "tags": tags,
         "tags_query": query_dto,
+    })
+
+
+@route("get", "categories", response_class=HTMLResponse)
+async def categories_page(cur_user: OptCurUserDep) -> str:
+    return get_html_content("categories.html", {
+        "cur_user": cur_user,
+        "categories": get_categories(),
     })
 
 
@@ -453,6 +463,15 @@ async def edit_tag(tag: TagDep, cur_user: CurUserDep) -> str:
     return get_html_content("edit-tag.html", {
         "cur_user": cur_user,
         "tag": tag,
+    })
+
+
+@route("get", "edit-category", response_class=HTMLResponse)
+async def edit_category(category: CategoryDep, cur_user: CurUserDep) -> str:
+    verify_authorization(cur_user, Permission.UPDATE_CATEGORY)
+    return get_html_content("edit-category.html", {
+        "cur_user": cur_user,
+        "category": category,
     })
 
 

@@ -1,4 +1,5 @@
-{% set image = prompt.image_filenames[0] if prompt.image_filenames else None %}
+{% set result_images = prompt.result_files|selectattr('format', 'equalto', 'image')|map(attribute='filename')|list if prompt else [] %}
+{% set image = result_images[0] if result_images else None %}
 {% set vert_gap = vert_gap | default(1) %}
 {% set h_tag_size = h_tag_size | default(3) %}
 {% set h_display_size = h_display_size | default(4) %}
