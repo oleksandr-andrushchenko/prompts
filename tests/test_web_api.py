@@ -7,7 +7,7 @@ import uuid
 from email import policy
 from email.parser import BytesParser
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import pytest
 from pyquery import PyQuery as pq
@@ -1384,13 +1384,24 @@ def test_prompt_slug_uniqueness_is_scoped_to_owner():
     }
     owner_clients = [get_logged_in_client(root_user), get_logged_in_client(regular_user)]
     prompt_ids = []
-    for owner_client in owner_clients:
+    slug = "shared-prompt-slug-across-owners"
+    for owner, owner_client in zip((root_user, regular_user), owner_clients):
         response = prompt(owner_client, "/prompts", json=payload)
         assert response.status_code == 200, response.text
-        prompt_ids.append(response.json().rstrip("/").split("/")[-1])
+        owner_item = get_dynamodb_user_by_email(owner["email"])
+        slug_item = dynamodb_table.get_item(Key={
+            "pk": f"PROMPT_SLUG#{owner_item['id']}#{slug}",
+            "sk": "META",
+        }).get("Item")
+        assert slug_item is not None
+        prompt_id = slug_item["prompt_id"]
+        prompt_item = get_dynamodb_prompt(prompt_id)
+        expected_path = (f"/@{prompt_item['user_slug']}/{slug}"
+                         if prompt_item.get("user_slug") else f"/prompts/{prompt_id}")
+        assert urlsplit(response.json()).path == expected_path
+        prompt_ids.append(prompt_id)
 
     assert prompt_ids[0] != prompt_ids[1]
-    slug = "shared-prompt-slug-across-owners"
     for prompt_id in prompt_ids:
         prompt_item = get_dynamodb_prompt(prompt_id)
         slug_item = dynamodb_table.get_item(Key={
@@ -1400,7 +1411,7 @@ def test_prompt_slug_uniqueness_is_scoped_to_owner():
         assert slug_item["prompt_id"] == prompt_id
 
     duplicate = prompt(owner_clients[0], "/prompts", json=payload)
-    assert duplicate.status_code == 422, duplicate.text
+    assert duplicate.status_code == 409, duplicate.text
 
 
 def test_structured_prompt_template_uses_matching_code_language():
@@ -1419,14 +1430,22 @@ def test_structured_prompt_template_uses_matching_code_language():
         "tags": [],
     })
     assert response.status_code == 200, response.text
-    prompt_id = response.json().rstrip("/").split("/")[-1]
+    prompt_path = urlsplit(response.json()).path
+    owner_item = get_dynamodb_user_by_email(root_user["email"])
+    prompt_slug = "structured-json-template-rendering"
+    slug_item = dynamodb_table.get_item(Key={
+        "pk": f"PROMPT_SLUG#{owner_item['id']}#{prompt_slug}",
+        "sk": "META",
+    }).get("Item")
+    assert slug_item is not None
+    prompt_id = slug_item["prompt_id"]
 
-    page = get(root_client, f"/prompts/{prompt_id}")
+    page = get(root_client, prompt_path)
     assert page.status_code == 200, page.text
     doc = pq(page.text)
     code = doc("pre.language-json > code.language-json")
     assert len(code) == 1
-    assert code.text() == template_content
+    assert code.text(squash_space=False) == template_content
     assert "prism-core.min.js" in page.text
 
     html_content = "<!DOCTYPE html>\n<html><body><h1>Travel itinerary</h1></body></html>"
@@ -1434,7 +1453,7 @@ def test_structured_prompt_template_uses_matching_code_language():
         "template": {"content": html_content, "format": "html"},
     })
     assert update.status_code == 200, update.text
-    html_page = get(root_client, f"/prompts/{prompt_id}")
+    html_page = get(root_client, prompt_path)
     html_code = pq(html_page.text)("pre.language-html > code.language-html")
     assert len(html_code) == 1
-    assert html_code.text() == html_content
+    assert html_code.text(squash_space=False) == html_content

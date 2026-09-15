@@ -36,12 +36,11 @@ def test_category_uses_internal_key():
         dto(category='Design & Image')
 
 
-def test_model_is_a_single_string_value():
+def test_model_values_are_canonicalized():
     assert issubclass(PromptModel, StrEnum)
     assert PromptModel.GPT_4O.value == 'openai-gpt-4o'
     assert dto().models == ['openai-gpt-4o']
-    with pytest.raises(ValueError):
-        dto(models=['GPT-4o (2024-05-13)'])
+    assert dto(models=['GPT-4o (2024-05-13)']).models == ['openai-gpt-*']
 
 
 def test_prompt_can_leave_models_unspecified():
