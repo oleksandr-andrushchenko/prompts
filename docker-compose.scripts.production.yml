@@ -2,6 +2,8 @@ services:
   scripts-production:
     profiles:
       - production
+    # Match the host user so refreshed AWS login-cache files remain host-readable.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     build:
       context: ./scripts
       dockerfile: Dockerfile
@@ -9,8 +11,9 @@ services:
       - .env.prod
     environment:
       FUNCTION_TEMPLATES_DIR: "/app/api-lambda/templates"
+      HOME: "/tmp/scripts-home"
     volumes:
       - ./:/app
-      - ${HOME}/.aws:/root/.aws:ro
+      - ${HOME}/.aws:/tmp/scripts-home/.aws:ro
       # AWS login refreshes its cached OAuth token during long production jobs.
-      - ${HOME}/.aws/login/cache:/root/.aws/login/cache
+      - ${HOME}/.aws/login/cache:/tmp/scripts-home/.aws/login/cache

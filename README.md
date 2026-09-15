@@ -148,6 +148,7 @@ from `AWS_STACK` CloudFormation outputs. The normal `scripts` service has only
 local dummy AWS credentials and no host AWS credential mount.
 
 ```sh
+HOST_UID="$(id -u)" HOST_GID="$(id -g)" \
 docker compose -f docker-compose.scripts.production.yml run --rm scripts-production \
   python scripts/import_prompts_chat.py --production \
   --user-id PRODUCTION_OWNER_USER_ID \
@@ -178,11 +179,13 @@ docker compose -f docker-compose.yml -f docker-compose.scripts.yml exec scripts 
   --apply
 
 # 3. Production dry run using the isolated production scripts service.
+HOST_UID="$(id -u)" HOST_GID="$(id -g)" \
 docker compose -f docker-compose.scripts.production.yml run --rm scripts-production \
   python scripts/import_prompts_chat.py --production \
   --user-id PRODUCTION_OWNER_USER_ID --root-user-id PRODUCTION_ROOT_USER_ID
 
 # 4. Production apply.
+HOST_UID="$(id -u)" HOST_GID="$(id -g)" \
 docker compose -f docker-compose.scripts.production.yml run --rm scripts-production \
   python scripts/import_prompts_chat.py --production \
   --user-id PRODUCTION_OWNER_USER_ID --root-user-id PRODUCTION_ROOT_USER_ID --apply

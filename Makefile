@@ -91,7 +91,7 @@ check-aws:
 
 .PHONY: clean
 clean: ## Remove build artifacts
-	@rm -rf $(SITE_BUILD_DIR) $(CODE_BUILD_DIR) .tmp
+	@rm -rf $(SITE_BUILD_DIR) $(CODE_BUILD_DIR) .tmp/web .tmp/api .tmp/img
 	@echo "🧹 Cleaned build artifacts"
 
 .PHONY: deploy-cert-infra
@@ -347,7 +347,7 @@ generate-img-lambda-code-files: check-prod-env-file scripts-up ## Build the Imag
 .PHONY: generate-code-files
 generate-code-files: ## Build all Lambda ZIPs
 	@echo "📦 Generating all Lambda code files..."
-	rm -rf $(CODE_BUILD_DIR) .tmp
+	rm -rf $(CODE_BUILD_DIR) .tmp/web .tmp/api .tmp/img
 	mkdir -p $(CODE_BUILD_DIR)
 	$(MAKE) generate-web-lambda-code-files
 	$(MAKE) generate-api-lambda-code-files
