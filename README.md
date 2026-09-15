@@ -142,11 +142,14 @@ Local mode explicitly uses dummy credentials and a local DynamoDB endpoint:
 `--endpoint`; local mode rejects remote hosts. The local table defaults to `app`.
 The importer reads local settings from `.env` when present.
 
-Production reads `.env.prod`, uses `AWS_PROJECT` as the AWS profile, and resolves
-the DynamoDB table and media bucket from `AWS_STACK` CloudFormation outputs:
+Production uses a separate, ephemeral scripts service. It reads `.env.prod`,
+mounts the host AWS profile, and resolves the DynamoDB table and media bucket
+from `AWS_STACK` CloudFormation outputs. The normal `scripts` service has only
+local dummy AWS credentials and no host AWS credential mount.
 
 ```sh
-python scripts/import_prompts_chat.py --production \
+docker compose -f docker-compose.scripts.production.yml run --rm scripts-production \
+  python scripts/import_prompts_chat.py --production \
   --user-id PRODUCTION_OWNER_USER_ID \
   --root-user-id PRODUCTION_ROOT_USER_ID \
   --default-models openai-gpt-*
@@ -174,13 +177,15 @@ docker compose -f docker-compose.yml -f docker-compose.scripts.yml exec scripts 
   --root-user-id LOCAL_ROOT_USER_ID \
   --apply
 
-# 3. Production dry run using .env.prod and the existing AWS profile/session.
-python scripts/import_prompts_chat.py --production --user-id PRODUCTION_OWNER_USER_ID \
-  --root-user-id PRODUCTION_ROOT_USER_ID
+# 3. Production dry run using the isolated production scripts service.
+docker compose -f docker-compose.scripts.production.yml run --rm scripts-production \
+  python scripts/import_prompts_chat.py --production \
+  --user-id PRODUCTION_OWNER_USER_ID --root-user-id PRODUCTION_ROOT_USER_ID
 
 # 4. Production apply.
-python scripts/import_prompts_chat.py --production --user-id PRODUCTION_OWNER_USER_ID \
-  --root-user-id PRODUCTION_ROOT_USER_ID --apply
+docker compose -f docker-compose.scripts.production.yml run --rm scripts-production \
+  python scripts/import_prompts_chat.py --production \
+  --user-id PRODUCTION_OWNER_USER_ID --root-user-id PRODUCTION_ROOT_USER_ID --apply
 ```
 
 Use `--default-models MODEL...` on all four commands only if prompts without an
