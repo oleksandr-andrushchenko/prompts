@@ -2190,25 +2190,44 @@ def get_popular_prompts_by_tags(
     if query_dto is None:
         query_dto = PromptQueryDTO()
 
-    # Increase limit to fetch more prompts before filtering
-    query_dto_copy = copy.copy(query_dto)
-    query_dto_copy.limit = max(query_dto.limit * 5, 100)
-
-    prompts = get_popular_prompts(query_dto_copy, cur_user)
-
     if not query_dto.tags:
-        return prompts
+        return get_popular_prompts(query_dto, cur_user)
 
-    offset = prompts[-1].offset if prompts else None
-
-    # Filter by tags
+    # Popular prompts are ordered by a global index, so tag filtering has to
+    # happen after each query. Keep following DynamoDB's continuation cursor:
+    # a response can stop at the 1 MB page-size limit before any matching
+    # prompt is encountered.
+    page_query = copy.copy(query_dto)
+    page_query.limit = max(query_dto.limit * 5, 100)
+    page_query.offset = query_dto.offset
     wanted_tags = set(query_dto.tags)
-    if or_mode:
-        filtered_prompts = [prompt for prompt in prompts if wanted_tags.intersection(prompt.tags)]
-    else:
-        filtered_prompts = [prompt for prompt in prompts if wanted_tags.issubset(set(prompt.tags))]
-    if filtered_prompts:
-        filtered_prompts[-1].offset = offset
+    filtered_prompts = []
+
+    while len(filtered_prompts) < query_dto.limit:
+        prompts = get_popular_prompts(page_query, cur_user)
+        if not prompts:
+            break
+
+        for prompt in prompts:
+            prompt_tags = set(prompt.tags)
+            matches = bool(wanted_tags.intersection(prompt_tags)) if or_mode \
+                else wanted_tags.issubset(prompt_tags)
+            if not matches:
+                continue
+
+            filtered_prompts.append(prompt)
+            if len(filtered_prompts) == query_dto.limit:
+                prompt.offset = encode_offset({
+                    "pk": f"PROMPT#{prompt.id}",
+                    "sk": "META",
+                    "prompt_status_pk": f"PROMPT#{prompt.status}",
+                    "rating_sk": prompt.rating,
+                })
+                return filtered_prompts
+
+        page_query.offset = prompts[-1].offset
+        if not page_query.offset:
+            break
 
     return filtered_prompts
 
