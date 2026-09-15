@@ -151,9 +151,9 @@ def get_error_response(status_code: int, details: dict | str = None):
     })
 
 
-def drop_cdn_cache(user: User) -> tuple[bool, int]:
+def drop_cdn_cache(user: User, paths: list[str] | None = None) -> tuple[bool, int]:
     verify_authorization(user, Permission.DROP_CDN_CACHE)
-    res = _drop_cdn_cache()
+    res = _drop_cdn_cache(paths or [])
     return res.get("success"), res.get("items_count")
 
 

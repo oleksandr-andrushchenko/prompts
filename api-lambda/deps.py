@@ -10,6 +10,7 @@ from prompt_dtos import UpdatePromptCommentDTO, UpdatePromptCommentImpressionDTO
 from tag_subscription_dtos import TagSubscriptionDTO
 from basic_dtos import ImageFileDTO
 from category_dtos import UpdateCategoryDTO
+from cdn_cache_dtos import DropCDNCacheDTO
 from query_dtos import PromptCommentQueryDTO
 from user_dtos import UpdateUserDTO, UpdateUserActivitySettingsDTO, UpdateUserImpressionDTO, UpdateUserInterestsSettingsDTO, UpdateUserStatusDTO
 from shared_utils import PromptComment, PromptCommentNotFoundError, get_prompt_comment
@@ -32,6 +33,10 @@ def get_update_user_dto(value: UpdateUserDTO = Body(...)) -> UpdateUserDTO:
 
 
 def get_tag_subscription_dto(value: TagSubscriptionDTO = Body(...)) -> TagSubscriptionDTO:
+    return value
+
+
+def get_drop_cdn_cache_dto(value: DropCDNCacheDTO = Body(...)) -> DropCDNCacheDTO:
     return value
 
 
@@ -105,6 +110,7 @@ UpdatePromptCommentImpressionDTODep = Annotated[
 UpdateTagDTODep = Annotated[UpdateTagDTO, Depends(get_update_tag_dto)]
 UpdateCategoryDTODep = Annotated[UpdateCategoryDTO, Depends(get_update_category_dto)]
 TagSubscriptionDTODep = Annotated[TagSubscriptionDTO, Depends(get_tag_subscription_dto)]
+DropCDNCacheDTODep = Annotated[DropCDNCacheDTO, Depends(get_drop_cdn_cache_dto)]
 ImageFileDTODep = Annotated[ImageFileDTO, Depends(get_image_file)]
 UpdateUserImpressionDTODep = Annotated[UpdateUserImpressionDTO, Depends(get_update_user_impression_dto)]
 PromptCommentQueryDep = Annotated[PromptCommentQueryDTO, Depends()]

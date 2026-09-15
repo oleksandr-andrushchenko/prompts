@@ -92,6 +92,7 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
     errorMessage = "Something went wrong. Please try again.",
     validationFailedMessage = "Please fix the highlighted fields.",
     rules = {},
+    prepareData = data => data,
     onSuccess = () => {
     },
     beforeSubmit = async () => {
@@ -202,6 +203,8 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
         ? values.map(item => toKebabCase(typeof item === "string" ? item : item.value)).filter(Boolean)
         : []
     }
+
+    data = prepareData(data)
 
     let msgClass = "danger"
     let msgIcon = "exclamation-triangle-fill"

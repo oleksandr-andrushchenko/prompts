@@ -1235,6 +1235,12 @@ def test_admin_page_sitemap_and_cache_endpoints_success_and_failure(guest_client
     cache_success = prompt(root_client, "/drop-cdn-cache", json={})
     assert cache_success.status_code == 200, cache_success.text
     assert cache_success.json()["success"] is True
+    assert cache_success.json()["items_count"] == 1
+    cache_paths = prompt(root_client, "/drop-cdn-cache", json={
+        "paths": ["/prompts", "/tags/*"],
+    })
+    assert cache_paths.status_code == 200, cache_paths.text
+    assert cache_paths.json()["items_count"] == 2
     cache_failure = prompt(regular_client, "/drop-cdn-cache", json={})
     assert cache_failure.status_code == 403
 
