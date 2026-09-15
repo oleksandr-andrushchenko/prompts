@@ -1,24 +1,5 @@
 import asyncio
 
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
-from deps import (
-    ImageFileDTODep,
-    PromptCommentQueryDep,
-    UpdateUserDTODep,
-    UpdateUserActivitySettingsDTODep,
-    UpdateUserInterestsSettingsDTODep,
-    UpdatePromptDTODep,
-    UpdatePromptStatusDTODep,
-    UpdatePromptImpressionDTODep,
-    UpdateUserImpressionDTODep,
-    UpdateUserStatusDTODep,
-    PromptCommentDep,
-    UpdatePromptCommentDTODep,
-    UpdateTagDTODep,
-    UpdateCategoryDTODep,
-    TagSubscriptionDTODep,
-)
 from api_utils import (
     get_error_response,
     to_thread,
@@ -70,6 +51,23 @@ from api_utils import (
     delete_tag_subscription,
     update_category,
 )
+from deps import (
+    ImageFileDTODep,
+    PromptCommentQueryDep,
+    UpdateUserDTODep,
+    UpdateUserActivitySettingsDTODep,
+    UpdateUserInterestsSettingsDTODep,
+    UpdatePromptDTODep,
+    UpdatePromptStatusDTODep,
+    UpdatePromptImpressionDTODep,
+    UpdateUserImpressionDTODep,
+    UpdateUserStatusDTODep,
+    PromptCommentDep,
+    UpdatePromptCommentDTODep,
+    UpdateTagDTODep,
+    UpdateCategoryDTODep,
+    TagSubscriptionDTODep,
+)
 from notifications import get_access_log
 from shared_deps import (
     OptCurUserDep,
@@ -87,13 +85,19 @@ from shared_utils import (
     get_tags,
     get_categories,
 )
-
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import PlainTextResponse
 from web import Application, Request, HTTPException, HTMLResponse, JSONResponse, RedirectResponse, \
     RequestValidationError, CORSMiddleware
 from web import TrailingSlashMiddleware
 
 app = Application()
 app.add_middleware(TrailingSlashMiddleware)
+
+
+@app.get("/robots.txt", name="api-robots")
+async def robots_txt():
+    return PlainTextResponse("User-agent: *\nDisallow: /\n")
 
 
 from api_route_metadata import API_URL_ROUTES
@@ -254,7 +258,7 @@ async def prompt_comments_fragment(prompt: PromptDep, query_dto: PromptCommentQu
 
 @route("patch", "update-prompt", response_class=JSONResponse)
 async def _update_prompt(prompt: PromptDep, update_prompt_dto: UpdatePromptDTODep, cur_user: CurUserDep,
-                          request: Request) -> str:
+                         request: Request) -> str:
     try:
         update_prompt(prompt, update_prompt_dto, cur_user, request)
         return get_prompt_url(request, prompt)
@@ -264,14 +268,14 @@ async def _update_prompt(prompt: PromptDep, update_prompt_dto: UpdatePromptDTODe
 
 @route("prompt", "update-prompt-status", response_class=JSONResponse)
 async def _update_prompt_status(prompt: PromptDep, update_prompt_status_dto: UpdatePromptStatusDTODep,
-                                 cur_user: CurUserDep, request: Request) -> str:
+                                cur_user: CurUserDep, request: Request) -> str:
     update_prompt_status(prompt, update_prompt_status_dto, cur_user, request)
     return get_prompt_url(request, prompt)
 
 
 @route("prompt", "update-prompt-impression", response_class=HTMLResponse)
 async def _update_prompt_impression(prompt: PromptDep, update_prompt_impression_dto: UpdatePromptImpressionDTODep,
-                                     cur_user: CurUserDep, request: Request) -> str:
+                                    cur_user: CurUserDep, request: Request) -> str:
     update_prompt_impression(prompt, update_prompt_impression_dto, cur_user, request)
     (
         prompt,
@@ -289,7 +293,7 @@ async def _update_prompt_impression(prompt: PromptDep, update_prompt_impression_
 
 @route("prompt", "create-prompt-comment", response_class=JSONResponse)
 async def _create_prompt_comment(prompt: PromptDep, prompt_comment_dto: PromptCommentDTO, cur_user: CurUserDep,
-                                  request: Request) -> str:
+                                 request: Request) -> str:
     prompt_comment = create_prompt_comment(prompt, prompt_comment_dto, cur_user, request)
     return get_prompt_comment_url(request, prompt, prompt_comment)
 
@@ -297,8 +301,8 @@ async def _create_prompt_comment(prompt: PromptDep, prompt_comment_dto: PromptCo
 @route("patch", "update-prompt-comment",
        response_class=JSONResponse)
 async def _update_prompt_comment(prompt: PromptDep, prompt_comment: PromptCommentDep,
-                                  update_prompt_comment_dto: UpdatePromptCommentDTODep, cur_user: CurUserDep,
-                                  request: Request) -> str:
+                                 update_prompt_comment_dto: UpdatePromptCommentDTODep, cur_user: CurUserDep,
+                                 request: Request) -> str:
     update_prompt_comment(prompt, prompt_comment, update_prompt_comment_dto, cur_user, request)
     return get_prompt_comment_url(request, prompt, prompt_comment)
 
@@ -320,6 +324,7 @@ async def _create_tag_subscription(dto: TagSubscriptionDTODep, cur_user: CurUser
             if len(dto.tags) == 1:
                 return await to_thread(find_tag, dto.tags[0])
             return None
+
         tag, tag_subscription = await asyncio.gather(
             get_tag(), to_thread(create_tag_subscription, dto, cur_user)
         )
@@ -348,8 +353,8 @@ async def _delete_tag_subscription(tag_subscription_id: str, cur_user: CurUserDe
 
 @route("patch", "update-tag", response_class=JSONResponse)
 async def _update_tag(update_tag_dto: UpdateTagDTODep, tag: TagDep,
-                              cur_user: CurUserDep,
-                              request: Request) -> str:
+                      cur_user: CurUserDep,
+                      request: Request) -> str:
     update_tag(tag, update_tag_dto, cur_user)
     return get_tag_url(request, tag)
 
@@ -440,8 +445,6 @@ async def user_prompts_fragment(user: UserDep, query_dto: PromptQueryDep, cur_us
         "prompts": get_latest_prompts_by_user(user, query_dto, cur_user),
         "cur_user": cur_user,
     })
-
-
 
 
 @route("prompt", "generate-sitemap")
