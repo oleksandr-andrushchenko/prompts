@@ -230,7 +230,8 @@ def get_prompt_related_prompts(prompt: Prompt, limit: int = 10) -> list[Prompt]:
     if not prompt.tags:
         return []
 
-    query_dto = PromptQueryDTO()
+    # Fetch one extra candidate because the current prompt can be part of the tag-filtered result set.
+    query_dto = PromptQueryDTO(limit=min(limit + 1, PromptQueryDTO.DEFAULT_LIMIT))
     query_dto.tags = prompt.tags
     prompts = get_popular_prompts_by_tags(query_dto, or_mode=True)
     tags = set(prompt.tags)
