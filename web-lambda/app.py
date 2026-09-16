@@ -311,7 +311,7 @@ async def _prompt_page(prompt: PromptDep, cur_user: OptCurUserDep) -> HTMLRespon
     ) = await asyncio.gather(
         to_thread(find_user, prompt.user_id),
         to_thread(find_prompt_impression, prompt, cur_user) if cur_user else asyncio.sleep(0, result=None),
-        to_thread(get_prompt_related_prompts, prompt),
+        get_prompt_related_prompts(prompt),
         to_thread(get_prompt_comments, prompt),
     )
 

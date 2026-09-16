@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from urllib.parse import quote, urlparse
 
 from shared_utils import *
@@ -8,7 +8,8 @@ from shared_utils import (
     UserByOldSlugRequestedError, NotAuthenticatedError, Permission,
     find_prompt_by_slug_follow_redirects, find_user_by_username_follow_redirects,
     verify_authorization, get_prompt_url, get_user_url, get_web_base_url, is_prod,
-    get_auth_token_max_age,
+    get_auth_token_max_age, get_dynamodb_table, prompt_from_dynamodb,
+    query_dynamodb_table, Key, to_thread,
 )
 
 
@@ -226,19 +227,65 @@ def get_popular_published_prompts(limit: int = BaseQueryDTO.DEFAULT_LIMIT) -> li
     return get_popular_prompts(query_dto)
 
 
-def get_prompt_related_prompts(prompt: Prompt, limit: int = 10) -> list[Prompt]:
+def _get_prompt_ids_by_tag(tag: str, limit: int) -> list[str]:
+    response = query_dynamodb_table(
+        key_condition_expr=Key("pk").eq(f"TAG_COMBO#{tag}"),
+        scan_index_forward=False,
+        limit=limit,
+    )
+    return [item["prompt_id"] for item in response.get("Items", []) if item.get("prompt_id")]
+
+
+def _get_prompts_by_ids(prompt_ids: list[str]) -> list[Prompt]:
+    if not prompt_ids:
+        return []
+
+    table = get_dynamodb_table()
+    keys = [{"pk": f"PROMPT#{prompt_id}", "sk": "META"} for prompt_id in prompt_ids]
+    items = []
+    batch_size = 100
+    max_attempts = 3
+
+    for start in range(0, len(keys), batch_size):
+        pending_keys = keys[start:start + batch_size]
+        for _ in range(max_attempts):
+            response = table.meta.client.batch_get_item(
+                RequestItems={table.name: {"Keys": pending_keys}}
+            )
+            items.extend(response.get("Responses", {}).get(table.name, []))
+            pending_keys = response.get("UnprocessedKeys", {}).get(table.name, {}).get("Keys", [])
+            if not pending_keys:
+                break
+        if pending_keys:
+            logger.warning("Related prompt batch read left unprocessed keys")
+
+    return [prompt_from_dynamodb(item) for item in items]
+
+
+async def get_prompt_related_prompts(prompt: Prompt, limit: int = 10) -> list[Prompt]:
     if not prompt.tags:
         return []
 
-    # Fetch one extra candidate because the current prompt can be part of the tag-filtered result set.
-    query_dto = PromptQueryDTO(limit=min(limit + 1, PromptQueryDTO.DEFAULT_LIMIT))
-    query_dto.tags = prompt.tags
-    prompts = get_popular_prompts_by_tags(query_dto, or_mode=True)
+    # Single-tag partitions contain small prompt-ID records. Query them in
+    # parallel, then batch-load only this bounded candidate set instead of
+    # scanning the global full-prompt popularity index.
+    per_tag_limit = limit + 1
+    prompt_ids_by_tag = await asyncio.gather(*(
+        to_thread(_get_prompt_ids_by_tag, tag, per_tag_limit)
+        for tag in prompt.tags
+    ))
+    prompt_ids = list(dict.fromkeys(
+        prompt_id
+        for tag_prompt_ids in prompt_ids_by_tag
+        for prompt_id in tag_prompt_ids
+        if prompt_id != prompt.id
+    ))
+    prompts = await to_thread(_get_prompts_by_ids, prompt_ids)
     tags = set(prompt.tags)
-    related_prompts = [candidate for candidate in prompts if candidate.id != prompt.id]
     return sorted(
-        related_prompts,
-        key=lambda candidate: len(tags.intersection(candidate.tags)),
+        (candidate for candidate in prompts
+         if candidate.id != prompt.id and candidate.status == PromptStatus.PUBLISHED),
+        key=lambda candidate: (len(tags.intersection(candidate.tags)), candidate.rating),
         reverse=True,
     )[:limit]
 
@@ -278,7 +325,6 @@ def parse_prompts_url_slugs_path(slugs_path: str) -> dict:
     return data
 
 
-
 def get_prompt_by_slugs(user_slug: str, prompt_slug: str, cur_user: User = None) -> Prompt:
     user = find_user_by_username_follow_redirects(user_slug)
     if user is None:
@@ -295,7 +341,6 @@ def get_prompt_by_slugs(user_slug: str, prompt_slug: str, cur_user: User = None)
     if prompt.slug != prompt_slug:
         raise PromptByOldSlugRequestedError(prompt_slug, prompt)
     return prompt
-
 
 
 def get_user_by_slug(username: str, cur_user: User = None) -> User:
@@ -326,13 +371,11 @@ def get_legacy_prompt_redirect_url(req, user_slug: str, prompt_slug: str) -> str
     return get_prompt_url(req, prompt)
 
 
-
 def _auth_cookie_domain() -> str | None:
     hostname = urlparse(get_web_base_url()).hostname
     if not hostname or hostname in {"localhost", "127.0.0.1"} or "." not in hostname:
         return None
     return f".{hostname}"
-
 
 
 def set_token_cookie(token, response):
@@ -346,7 +389,6 @@ def set_token_cookie(token, response):
         samesite="lax",
         max_age=get_auth_token_max_age(),
     )
-
 
 
 def drop_token_cookie(response):
