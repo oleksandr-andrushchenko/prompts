@@ -930,6 +930,10 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert f"{PROMPT_IMAGE_FILENAME.rsplit('_', 1)[0]}_1024x" in rendered_source.attr("srcset")
     rendered_img = rendered_picture("img")
     assert rendered_img.attr("alt") == "Functional endpoint coverage prompt output 1"
+    assert rendered_img.attr("loading") is None
+    assert rendered_img.attr("decoding") is None
+    assert rendered_img.attr("onerror") is None
+    assert rendered_img.attr("data-fallback-src").endswith(f"/{PROMPT_IMAGE_FILENAME}")
 
     dynamodb_table.update_item(
         Key={"pk": f"PROMPT#{prompt_id}", "sk": "META"},
