@@ -106,6 +106,38 @@ custom domain, with no `/api` path prefix.
 
 - `img-lambda/` — S3 image variant Lambda
 
+## Setting up tag names and images
+
+`scripts/setup_tags.py` converts stored tag slugs to display names and fills
+missing tag images with the first Pexels result for that name from the
+official Pexels API. Existing images are preserved. Add `PEXELS_API_KEY` to
+`.env` for local runs and `.env.prod` for production runs.
+
+The safe defaults are a local DynamoDB target and a dry run:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.scripts.yml exec scripts \
+  python scripts/setup_tags.py --limit 10
+```
+
+Review the JSON plan, then add `--apply` to write the local images and tag
+updates. Omit `--limit` to process every tag that needs a name or image. Applied
+runs use the only active root user automatically; pass `--user-id` or set
+`TAG_SETUP_USER_ID` when that is ambiguous. Pexels searches are spaced 18.5
+seconds apart by default to remain below the documented 200 requests/hour
+limit; use `--pexels-delay` only when a different approved limit applies.
+
+Production is selected explicitly and remains a dry run without `--apply`:
+
+```sh
+HOST_UID="$(id -u)" HOST_GID="$(id -g)" \
+docker compose -f docker-compose.scripts.production.yml run --rm scripts-production \
+  python scripts/setup_tags.py --production --limit 10
+```
+
+Each planned and applied image includes its Pexels page, photographer, and
+photographer profile in the JSON output for provenance and attribution.
+
 ## Importing prompts.chat content
 
 The importer combines every logical row from a pinned `prompts.csv` commit with
