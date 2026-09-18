@@ -934,6 +934,43 @@ $(function () {
 })
 
 $(function () {
+  $(".copy-prompt-template").on("click", async function () {
+    const button = this
+    const icon = button.querySelector("i")
+    const label = button.querySelector("span")
+    const promptTemplate = document.getElementById("prompt-template")
+    const textToCopy = promptTemplate.textContent
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textToCopy)
+      } else {
+        const textarea = document.createElement("textarea")
+        textarea.value = textToCopy
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand("copy")
+        textarea.remove()
+      }
+
+      icon.classList.replace("bi-copy", "bi-check-lg")
+      label.textContent = "Copied!"
+      setTimeout(() => {
+        icon.classList.replace("bi-check-lg", "bi-copy")
+        label.textContent = "Copy"
+      }, 1500)
+    } catch (error) {
+      label.textContent = "Copy failed"
+      setTimeout(() => {
+        label.textContent = "Copy"
+      }, 1500)
+    }
+  })
+})
+
+$(function () {
   $(".copy-url button").on("click", function () {
     const $btn = $(this)
     const $input = $btn.closest(".input-group").find("input")

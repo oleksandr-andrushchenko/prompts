@@ -924,6 +924,13 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert len(template_code) == 1
     assert template_code.text(squash_space=False) == PROMPT_TEMPLATE.replace(
         "${Language:Turkish}", "${language:Turkish}")
+    assert template_code.attr("id") == "prompt-template"
+    copy_button = read_doc("button.copy-prompt-template")
+    assert len(copy_button) == 1
+    assert copy_button.attr("type") == "button"
+    assert copy_button.attr("aria-label") == "Copy prompt template"
+    assert copy_button("i.bi-copy")
+    assert copy_button("span").text() == "Copy"
     assert "prism-core.min.js" in read_success.text
     rendered_picture = read_doc("article picture")
     assert len(rendered_picture) == 1

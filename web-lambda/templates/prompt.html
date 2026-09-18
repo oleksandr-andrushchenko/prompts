@@ -235,8 +235,15 @@
                 {% endif %}
 
                 <section class="prompt-content mb-4">
-                    <h2 class="h5 text-decoration-underline">Prompt template</h2>
-                    <pre class="language-{{ template_language }} mb-3"><code class="language-{{ template_language }}">{{ prompt.template.content }}</code></pre>
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                        <h2 class="h5 text-decoration-underline mb-0">Prompt template</h2>
+                        <button class="btn btn-sm btn-outline-secondary copy-prompt-template" type="button"
+                                aria-label="Copy prompt template">
+                            <i class="bi bi-copy" aria-hidden="true"></i>
+                            <span>Copy</span>
+                        </button>
+                    </div>
+                    <pre class="language-{{ template_language }} mb-3"><code id="prompt-template" class="language-{{ template_language }}">{{ prompt.template.content }}</code></pre>
                 </section>
 
                 {% if prompt.params %}
