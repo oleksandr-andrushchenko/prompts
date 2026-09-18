@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% set result_images = prompt.result_files|selectattr('format', 'equalto', 'image')|map(attribute='filename')|list if prompt else [] %}
 {% set template_language = "none" if prompt.template.format == "code" else prompt.template.format %}
-{% set layout_assets = {"masonry": true, "prism": prompt.template.format != "text"} %}
+{% set layout_assets = {"masonry": true, "prism": true} %}
 {% set prompt_canonical_url = prompt_url(prompt, absolute=True) %}
 {% set prompt_alternate_url = url("prompt", prompt_id=prompt.id, absolute=True) %}
 {% set author_canonical_url = user_url(author, absolute=True) %}
@@ -236,11 +236,7 @@
 
                 <section class="prompt-content mb-4">
                     <h2 class="h5 text-decoration-underline">Prompt template</h2>
-                    {% if prompt.template.format == "text" %}
-                        <div class="prompt-content-text mb-3">{{ prompt.template.content }}</div>
-                    {% else %}
-                        <pre class="language-{{ template_language }} mb-3"><code class="language-{{ template_language }}">{{ prompt.template.content }}</code></pre>
-                    {% endif %}
+                    <pre class="language-{{ template_language }} mb-3"><code class="language-{{ template_language }}">{{ prompt.template.content }}</code></pre>
                 </section>
 
                 {% if prompt.params %}

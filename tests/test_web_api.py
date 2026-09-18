@@ -920,6 +920,11 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert prompt_schema["image"][0].endswith(f"/{PROMPT_IMAGE_FILENAME}")
     assert prompt_schema["thumbnailUrl"].endswith(f"/{PROMPT_IMAGE_FILENAME}")
     assert read_doc('meta[name="robots"]').attr("content") == "index, follow"
+    template_code = read_doc("pre.language-text > code.language-text")
+    assert len(template_code) == 1
+    assert template_code.text(squash_space=False) == PROMPT_TEMPLATE.replace(
+        "${Language:Turkish}", "${language:Turkish}")
+    assert "prism-core.min.js" in read_success.text
     rendered_picture = read_doc("article picture")
     assert len(rendered_picture) == 1
     rendered_source = rendered_picture("source")
