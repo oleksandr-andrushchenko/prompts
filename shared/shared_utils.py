@@ -2,12 +2,10 @@ import asyncio
 import base64
 import copy
 import datetime
-import html
 import json
 import logging
 import math
 import os
-from pathlib import Path
 import re
 import sys
 import time
@@ -18,22 +16,23 @@ from decimal import Decimal
 from enum import StrEnum
 from functools import lru_cache, partial
 from html import unescape
+from pathlib import Path
 from typing import Callable, TypeVar, Any
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
-
 from api_route_metadata import API_URL_ROUTES
+from basic_dtos import UserTokenDTO
+from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
+from notifications import configure_telegram_logging
 from prompt_contracts import extract_template_params, normalize_template_params
 from prompt_dtos import (PromptCommentImpressionAction, PromptImpressionAction)
-from tag_subscription_dtos import TagSubscription
-from basic_dtos import UserTokenDTO
-from notifications import configure_telegram_logging
+from prompt_models import PROMPT_CATEGORIES, PROMPT_MODELS, PROMPT_FORMATS, PROMPT_TEMPLATE_FORMATS, PromptCategory, \
+    PromptModel, get_prompt_model
 from query_dtos import (BaseQueryDTO, PromptCommentQueryDTO, PromptQueryDTO, PromptQueryType, PromptStatus,
                         TagQueryDTO, TagQueryType, UserQueryDTO, UserQueryType, UserStatus)
+from tag_subscription_dtos import TagSubscription
 from user_dtos import UserImpressionAction
-from prompt_models import PROMPT_CATEGORIES, PROMPT_MODELS, PROMPT_FORMATS, PROMPT_TEMPLATE_FORMATS, PromptCategory, PromptModel, get_prompt_model
 
 
 def Key(*args, **kwargs):
@@ -589,7 +588,7 @@ def tag_subscription_key(tags: list[str]) -> str:
 
 def tag_subscription_from_dynamodb(item: dict[str, Any]) -> TagSubscription:
     return TagSubscription(item["tag_subscription_id"], item["user_id"], item["tags"],
-                                  item["created_at"])
+                           item["created_at"])
 
 
 def get_user_tag_subscriptions(user: User) -> list[TagSubscription]:
@@ -1058,7 +1057,6 @@ def jinja2_order_classes(orders, inverse: bool = False) -> str:
     return jinja2_build_responsive_classes(orders, prefixes, inverse)
 
 
-
 def get_jinja2_env():
     shared_templates_dir = os.path.join(os.path.dirname(__file__), "templates")
     function_templates_dir = os.getenv("FUNCTION_TEMPLATES_DIR", "")
@@ -1078,6 +1076,7 @@ def get_jinja2_env():
         "col_classes": jinja2_col_classes,
         "row_classes": jinja2_row_classes,
         "order_classes": jinja2_order_classes,
+        "capitalize": capitalize_words,
     })
     jinja2_env.globals.update(get_config())
     jinja2_env.globals.update({
@@ -1490,7 +1489,7 @@ def add_put_tag_combos_transact(transacts: list, prompt: Prompt, slug: str | Non
         for combo in combinations(sorted(prompt.tags), r):
             if slug is None or slug in combo:
                 tag_combo_key = ("TAG_COMBO#" + "#".join(combo),
-                                         f"PROMPT#{prompt.created_at}#{prompt.id}")
+                                 f"PROMPT#{prompt.created_at}#{prompt.id}")
                 add_dynamodb_put_transact(transacts, tag_combo_key, {"prompt_id": prompt.id})
 
 
@@ -1500,7 +1499,7 @@ def add_delete_tag_combos_transact(transacts: list, prompt: Prompt, slug: str | 
         for combo in combinations(sorted(prompt.tags), r):
             if slug is None or slug in combo:
                 tag_combo_key = ("TAG_COMBO#" + "#".join(combo),
-                                         f"PROMPT#{prompt.created_at}#{prompt.id}")
+                                 f"PROMPT#{prompt.created_at}#{prompt.id}")
                 add_dynamodb_delete_transact(transacts, tag_combo_key)
 
 
@@ -1573,7 +1572,7 @@ def add_decrease_tags_rating_transact(transacts: list, tags: list, now):
 
 
 def add_update_category_published_count_transact(transacts: list, category_slug: str,
-                                                   delta: int, now: int) -> None:
+                                                 delta: int, now: int) -> None:
     category = PromptCategory(category_slug)
     default_count = 0 if delta > 0 else 1
     transacts.append({
@@ -1888,14 +1887,14 @@ def add_dynamodb_user_update_transact(transacts: list, user: User, changes: dict
 
 
 def add_dynamodb_prompt_update_transact(transacts: list, prompt: Prompt, changes: dict[str, Any] | None = None,
-                                         deltas: dict[str, Any] | None = None) -> None:
+                                        deltas: dict[str, Any] | None = None) -> None:
     return add_dynamodb_obj_update_transact(transacts, prompt, (f"PROMPT#{prompt.id}", "META"), changes=changes,
                                             deltas=deltas)
 
 
 def add_dynamodb_tag_update_transact(transacts: list, tag: Tag,
-                                             changes: dict[str, Any] | None = None,
-                                             deltas: dict[str, Any] | None = None) -> None:
+                                     changes: dict[str, Any] | None = None,
+                                     deltas: dict[str, Any] | None = None) -> None:
     return add_dynamodb_obj_update_transact(transacts, tag, (f"TAG#{tag.slug}", "META"),
                                             changes=changes,
                                             deltas=deltas)
@@ -2428,6 +2427,13 @@ def unix_to_full_date(timestamp: int, tz: str | None = None) -> str:
 def jinja2_iso_utc(timestamp_ms: int) -> str:
     dt = to_datetime(timestamp_ms / 1000)
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def capitalize_words(value: str):
+    return " ".join(
+        word[:1].upper() + word[1:]
+        for word in value.split(" ")
+    )
 
 
 def get_latest_published_prompts_by_user(user: User) -> list[Prompt]:
