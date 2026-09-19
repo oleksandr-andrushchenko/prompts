@@ -1,4 +1,4 @@
-<a href="{{ prompt_url(prompt) }}">
+<a href="{{ prompt_url(prompt) }}" class="position-relative d-block w-100">
     {% with filename=image,
         alt=prompt.title,
         img_class="img-fluid w-100 h-100 object-fit-cover" if horizontal else "card-img-top w-100 h-auto",
@@ -6,4 +6,11 @@
         img_sizes=prompt_img_sizes %}
         {% include "fragments/image.html" %}
     {% endwith %}
+    {% if video_preview %}
+        <span class="position-absolute top-50 start-50 translate-middle rounded-circle bg-dark bg-opacity-75 text-white d-flex align-items-center justify-content-center"
+              style="width: 3rem; height: 3rem" aria-hidden="true">
+            <i class="bi bi-play-fill fs-2"></i>
+        </span>
+        <span class="visually-hidden">Video preview</span>
+    {% endif %}
 </a>

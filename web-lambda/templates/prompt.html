@@ -1,5 +1,7 @@
 {% extends "layout.html" %}
 {% set result_images = prompt.result_files|selectattr('format', 'equalto', 'image')|map(attribute='filename')|list if prompt else [] %}
+{% set video_previews = prompt.result_files|selectattr('format', 'equalto', 'video')|selectattr('preview_filename', 'defined')|map(attribute='preview_filename')|list if prompt else [] %}
+{% set result_preview_images = result_images if result_images else video_previews %}
 {% set template_language = "none" if prompt.template.format == "code" else prompt.template.format %}
 {% set layout_assets = {"masonry": true, "prism": true} %}
 {% set prompt_canonical_url = prompt_url(prompt, absolute=True) %}
@@ -12,14 +14,15 @@
 {% set og_type = "prompt" %}
 {% set meta_canonical_url = prompt_canonical_url %}
 {% set og_url = meta_canonical_url %}
-{% set og_img_filename = result_images[0] %}
+{% set og_img_filename = result_preview_images[0] if result_preview_images else None %}
 {% set prompt_og_author = author_canonical_url %}
 {% set prompt_og_published_time = prompt.published_at | iso_utc if prompt.published_at else None %}
 {% set prompt_og_modified_time = prompt.updated_at | iso_utc if prompt.updated_at and prompt.published_at else None %}
 {% set prompt_og_tags = prompt.tags %}
 {% block meta_schema %}
     {% set prompt_body = prompt.template.content %}
-    {% set prompt_image_url = result_images[0] if result_images[0] and (result_images[0].startswith('http://') or result_images[0].startswith('https://')) else static_url(result_images[0], absolute=True) if result_images[0] else None %}
+    {% set prompt_image_filename = result_preview_images[0] if result_preview_images else None %}
+    {% set prompt_image_url = prompt_image_filename if prompt_image_filename and (prompt_image_filename.startswith('http://') or prompt_image_filename.startswith('https://')) else static_url(prompt_image_filename, absolute=True) if prompt_image_filename else None %}
     {% set comment_schemas = namespace(values=[]) %}
     {% for prompt_comment in comments %}
         {% set comment_user = prompt_comment.get_user() %}
@@ -174,6 +177,7 @@
                             <div class="mb-3">
                                 {% if result.format == 'video' %}
                                     <video class="w-100 rounded" controls preload="metadata"
+                                           {% if result.preview_filename is defined %}poster="{{ static_url(result.preview_filename, absolute=True) }}"{% endif %}
                                            aria-label="Example video {{ loop.index }}">
                                         <source src="{{ static_url(result.filename, absolute=True) }}">
                                         Your browser does not support video playback.

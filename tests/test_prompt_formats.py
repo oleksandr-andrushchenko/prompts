@@ -129,7 +129,10 @@ def test_partial_update_preserves_unmodified_fields():
 
 
 def test_unified_result_files():
-    files = [{'filename': 'example.png', 'format': 'image'}, {'filename': 'demo.mp4', 'format': 'video'}]
+    files = [
+        {'filename': 'example.png', 'format': 'image'},
+        {'filename': 'demo.mp4', 'format': 'video', 'preview_filename': 'demo_320x180.jpg'},
+    ]
     assert dto(result_files=files).result_files == files
     assert UpdatePromptDTO(result_files=[]).get_changes(dto(result_files=files)) == {'result_files': []}
     item = dict(id='example', user_id='owner', title='Example', description='Example', category='code-dev',
@@ -163,6 +166,9 @@ def test_result_files_are_not_artificially_count_limited():
     {'filename': 'https://example.com/demo.mp4', 'format': 'video'},
     {'filename': 'javascript:alert(1)', 'format': 'image'},
     {'filename': 'file.html', 'format': 'html'},
+    {'filename': 'speech.mp3', 'format': 'audio', 'preview_filename': 'preview.jpg'},
+    {'filename': 'demo.mp4', 'format': 'video', 'preview_filename': '../preview.jpg'},
+    {'filename': 'demo.mp4', 'format': 'video', 'unknown': 'value'},
 ])
 def test_invalid_result_files(file):
     with pytest.raises(ValueError):

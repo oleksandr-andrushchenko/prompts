@@ -62,8 +62,11 @@ def _validate_result_files(values):
         raise ValueError("result_files must be a list")
     result = []
     for item in values:
-        if not isinstance(item, dict) or set(item) != {"filename", "format"}:
+        if not isinstance(item, dict) or not {"filename", "format"} <= set(item):
             raise ValueError("each result file requires filename and format")
+        allowed_fields = {"filename", "format", "preview_filename"}
+        if set(item) - allowed_fields:
+            raise ValueError("result file contains unsupported fields")
         filename = item["filename"]
         image_url = (isinstance(filename, str) and item['format'] == 'image'
                      and urlsplit(filename).scheme in ('http', 'https') and bool(urlsplit(filename).netloc))
@@ -73,6 +76,16 @@ def _validate_result_files(values):
             raise ValueError("result filename must be a local asset filename")
         if item["format"] not in ("image", "video", "audio", "text"):
             raise ValueError("result file format must be image, video, audio, or text")
+        preview_filename = item.get("preview_filename")
+        if preview_filename is not None:
+            if item["format"] != "video":
+                raise ValueError("result preview is supported only for video files")
+            if (not isinstance(preview_filename, str) or not preview_filename
+                    or len(preview_filename) > 255
+                    or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+                           for char in preview_filename)
+                    or preview_filename.startswith(".")):
+                raise ValueError("result preview filename must be a local asset filename")
         if item not in result:
             result.append(dict(item))
     return result

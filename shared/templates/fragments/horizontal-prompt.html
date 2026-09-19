@@ -1,5 +1,7 @@
 {% set result_images = prompt.result_files|selectattr('format', 'equalto', 'image')|map(attribute='filename')|list if prompt else [] %}
-{% set image = result_images[0] if result_images else None %}
+{% set video_previews = prompt.result_files|selectattr('format', 'equalto', 'video')|selectattr('preview_filename', 'defined')|map(attribute='preview_filename')|list if prompt else [] %}
+{% set image = result_images[0] if result_images else video_previews[0] if video_previews else None %}
+{% set video_preview = not result_images and video_previews %}
 {% set vert_gap = vert_gap | default(1) %}
 {% set h_tag_size = h_tag_size | default(3) %}
 {% set h_display_size = h_display_size | default(4) %}
