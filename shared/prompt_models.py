@@ -160,8 +160,8 @@ class PromptModel(StrEnum):
 PROMPT_MODELS = tuple(PromptModel)
 
 
-# prompts.chat omits provider prefixes. Normalize its current values into the
-# catalog's stable provider-qualified model slugs.
+# Normalize common unqualified model spellings into the catalog's stable
+# provider-qualified model slugs.
 PROMPT_MODEL_ALIASES = {
     "gpt-*": PromptModel.GPT_ANY,
     "gpt-5-*": PromptModel.GPT_5_ANY,
