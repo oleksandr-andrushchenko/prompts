@@ -11,14 +11,14 @@
 {% set meta_desc = [prompt.title, meta_desc, meta_desc] | select | join('. ') | truncate(155, True, '...') %}
 {% set meta_title = prompt.title ~ " | by " ~ author.name ~ " ~ " ~ site_name %}
 {% set meta_robots = "index, follow" %}
-{% set og_type = "prompt" %}
+{% set og_type = "article" %}
 {% set meta_canonical_url = prompt_canonical_url %}
 {% set og_url = meta_canonical_url %}
 {% set og_img_filename = result_preview_images[0] if result_preview_images else None %}
-{% set prompt_og_author = author_canonical_url %}
-{% set prompt_og_published_time = prompt.published_at | iso_utc if prompt.published_at else None %}
-{% set prompt_og_modified_time = prompt.updated_at | iso_utc if prompt.updated_at and prompt.published_at else None %}
-{% set prompt_og_tags = prompt.tags %}
+{% set article_og_author = author_canonical_url %}
+{% set article_og_published_time = prompt.published_at | iso_utc if prompt.published_at else None %}
+{% set article_og_modified_time = prompt.updated_at | iso_utc if prompt.updated_at and prompt.published_at else None %}
+{% set article_og_tags = prompt.tags %}
 {% block meta_schema %}
     {% set prompt_body = prompt.template.content %}
     {% set prompt_image_filename = result_preview_images[0] if result_preview_images else None %}

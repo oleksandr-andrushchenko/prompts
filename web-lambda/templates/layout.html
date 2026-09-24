@@ -82,15 +82,15 @@
         <meta name="twitter:image" content="{{ social_image_url }}"/>
     {% endif %}
 
-    {% if og_type == "prompt" %}
-        {% if prompt_og_author %}
-            <meta property="prompt:author" content="{{ prompt_og_author }}"/>{% endif %}
-        {% if prompt_og_published_time %}
-            <meta property="prompt:published_time" content="{{ prompt_og_published_time }}"/>{% endif %}
-        {% if prompt_og_modified_time %}
-            <meta property="prompt:modified_time" content="{{ prompt_og_modified_time }}"/>{% endif %}
-        {% for tag in prompt_og_tags %}
-            <meta property="prompt:tag" content="{{ tag }}"/>{% endfor %}
+    {% if og_type == "article" %}
+        {% if article_og_author %}
+            <meta property="article:author" content="{{ article_og_author }}"/>{% endif %}
+        {% if article_og_published_time %}
+            <meta property="article:published_time" content="{{ article_og_published_time }}"/>{% endif %}
+        {% if article_og_modified_time %}
+            <meta property="article:modified_time" content="{{ article_og_modified_time }}"/>{% endif %}
+        {% for tag in article_og_tags %}
+            <meta property="article:tag" content="{{ tag }}"/>{% endfor %}
     {% endif %}
 
     <script type="application/ld+json">{% block meta_schema %}
@@ -270,7 +270,9 @@
 
 <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
       as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"></noscript>
+<noscript>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+</noscript>
 <!--bs-->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
@@ -285,7 +287,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js" defer></script>
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" as="style"
           onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css"></noscript>
+    <noscript>
+        <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css">
+    </noscript>
 {% endif %}
 <!--jquery-->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"
@@ -321,7 +325,9 @@
 {% if layout_assets.prism | default(false) %}
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/prismjs@1.x/themes/prism.css" as="style"
           onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="https://cdn.jsdelivr.net/npm/prismjs@1.x/themes/prism.css" rel="stylesheet"></noscript>
+    <noscript>
+        <link href="https://cdn.jsdelivr.net/npm/prismjs@1.x/themes/prism.css" rel="stylesheet">
+    </noscript>
 {% endif %}
 {% if layout_assets.masonry | default(false) %}
     <script src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js"
