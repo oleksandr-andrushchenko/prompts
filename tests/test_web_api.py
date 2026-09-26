@@ -933,7 +933,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert prompt_schema["@type"] == "Prompt"
     assert prompt_schema["inLanguage"] == "en"
     assert prompt_schema["author"]["url"].endswith("/@root-functional")
-    assert read_doc('meta[property="og:type"]').attr("content") == "prompt"
+    assert read_doc('meta[property="og:type"]').attr("content") == "article"
     assert read_doc('meta[property="og:url"]').attr("content").endswith(
         f"/@root-functional/{functional_state['prompt_slug']}")
     assert not read_doc('meta[name="keywords"]')
