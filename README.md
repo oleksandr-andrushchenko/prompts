@@ -170,7 +170,6 @@ photographer profile in the JSON output for provenance and attribution.
 - prompts file uploader upload -> remove -> upload bug
 - send newly created content's links to search-engines
 - replace `get_config().get("web_base_url") or ""` with `get_config("web_base_url")`, same for `config.get("web_base_url") or ""`
-- add rel nofollow for auth links
 
 ## Links
 
