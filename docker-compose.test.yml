@@ -25,6 +25,7 @@ services:
       DYNAMODB_TABLE: app_test
       EMAIL_FILES_DIR: "/app-emails"
       STATIC_FILES_DIR: "/app-static"
+      THREADS_ACCESS_TOKEN: ""
       PYTHONPATH: "/app:/web-lambda"
       FUNCTION_TEMPLATES_DIR: "/web-lambda/templates"
     volumes:

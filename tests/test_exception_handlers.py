@@ -186,4 +186,5 @@ class ExceptionHandlerTests(unittest.TestCase):
         with patch.object(module, "get_static_base_url", return_value="https://static.example.com"):
             robots = asyncio.run(module.robots_txt())
         self.assertIn(b"Allow: /", robots.body)
+        self.assertIn(b"Disallow: /*?*source=threads", robots.body)
         self.assertIn(b"Sitemap: https://static.example.com/sitemap.xml", robots.body)

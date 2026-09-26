@@ -115,6 +115,18 @@ def get_prompts(client):
     return doc
 
 
+def test_hot_threads_filter_requires_catalog_tag(guest_client):
+    response = get(guest_client, "/not-a-real-catalog-tag-xyz/prompts?source=threads")
+    assert response.status_code == 200
+    assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
+    doc = pq(response.text)
+    assert "Hot on Threads" in doc("main h1").text()
+    assert doc('meta[name="robots"][content="noindex, nofollow"]')
+    assert "Select at least one catalog tag" in doc("main").text()
+    assert doc('a[href="/not-a-real-catalog-tag-xyz/prompts?source=threads"][rel="nofollow"]')
+    assert doc('a[href="/not-a-real-catalog-tag-xyz/prompts"]')
+
+
 def get_prompt_by_id(client, prompt):
     resp = get(client, f"/prompts/{prompt['id']}")
     assert resp.status_code == 200

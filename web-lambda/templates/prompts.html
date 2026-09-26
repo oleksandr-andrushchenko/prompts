@@ -12,8 +12,12 @@
 
 {% set subject_labels = [category.name] if category else (prompt_query.tags if prompt_query.tags else []) %}
 {% set title = ([val_map[prompt_query.type]["title"]] + subject_labels + [val_map[prompt_query.status]["title"]] + [site_about]) | select | join(" ") | capitalize %}
-{% set meta_robots = "noindex, follow" if prompt_query.status != PromptStatus.PUBLISHED else "index, follow" %}
 {% set subtitle = category.description if category else ([val_map[prompt_query.type]["subtitle"]]  + prompt_query.tags + [val_map[prompt_query.status]["subtitle"]] + [site_about]) | select | join(" ") | capitalize %}
+{% if threads_mode %}
+    {% set title = ("Hot on Threads: " ~ (subject_labels | join(", "))) %}
+    {% set subtitle = "Public Threads posts related to " ~ (subject_labels | join(", ")) %}
+{% endif %}
+{% set meta_robots = "noindex, nofollow" if threads_mode else ("noindex, follow" if prompt_query.status != PromptStatus.PUBLISHED else "index, follow") %}
 {% set meta_title = title ~ " | " ~ site_name %}
 {% set meta_canonical_url = prompts_url(query=prompt_query, tags=prompt_query.tags|sort, absolute=True) %}
 {% set meta_desc = [title, subtitle, site_desc] | select | join('. ') | truncate(155, True, '...') %}
@@ -117,18 +121,21 @@
 
         <input type="hidden" name="type" value="{{ prompt_query.type }}">
         <input type="hidden" name="status" value="{{ prompt_query.status }}">
+        {% if threads_mode %}<input type="hidden" name="source" value="threads">{% endif %}
         {% if prompt_query.category %}<input type="hidden" name="category" value="{{ prompt_query.category }}">{% endif %}
 
         <div class="d-flex align-items-center gap-2">
             <small class="text-secondary bi bi-sort-down"> Show:</small>
             <div class="btn-group btn-group-sm" role="group">
                 {% set is_latest = prompt_query.type == PromptQueryType.LATEST %}
-                <a href="{{ prompts_url(**prompt_query.get_dict({"type": None if is_latest else PromptQueryType.LATEST})) }}"
+                <a href="{{ prompts_url(**prompt_query.get_dict({"type": None if is_latest else PromptQueryType.LATEST, "source": "threads" if threads_mode else None})) }}"
+                   {% if threads_mode %}rel="nofollow"{% endif %}
                    class="btn {% if is_latest %}btn-secondary active{% else %}btn-light{% endif %} bi bi-clock{{ "-fill" if is_latest else "" }}">
                     {{ PromptQueryType.LATEST | capitalize }} first
                 </a>
                 {% set is_popular = prompt_query.type == PromptQueryType.POPULAR %}
-                <a href="{{ prompts_url(**prompt_query.get_dict({"type": None if is_popular else PromptQueryType.POPULAR})) }}"
+                <a href="{{ prompts_url(**prompt_query.get_dict({"type": None if is_popular else PromptQueryType.POPULAR, "source": "threads" if threads_mode else None})) }}"
+                   {% if threads_mode %}rel="nofollow"{% endif %}
                    class="btn {% if is_popular %}btn-primary active{% else %}btn-light{% endif %} bi bi-star{{ "-fill" if is_popular else "" }}">
                     {{ PromptQueryType.POPULAR | capitalize }} first
                 </a>
@@ -148,6 +155,23 @@
 
             <button class="btn btn-light btn-sm bi bi-search" type="submit"> Search</button>
         </div>
+
+        {% if prompt_query.tags %}
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-secondary bi bi-globe"> Source:</small>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Content source">
+                    <a href="{{ prompts_url(**prompt_query.get_dict({"source": None, "offset": None})) }}"
+                       class="btn {% if not threads_mode %}btn-dark active{% else %}btn-light{% endif %}">
+                        PromptCatalog
+                    </a>
+                    <a href="{{ prompts_url(**prompt_query.get_dict({"source": "threads", "offset": None})) }}"
+                       rel="nofollow"
+                       class="btn {% if threads_mode %}btn-dark active{% else %}btn-light{% endif %} bi bi-threads">
+                        Hot on Threads
+                    </a>
+                </div>
+            </div>
+        {% endif %}
 
         {% if cur_user and check_auth(cur_user, Permission.READ_NON_PUBLISHED_PROMPT) %}
             <div class="d-flex align-items-center gap-2">
@@ -193,7 +217,17 @@
         {% endif %}
     </form>
 
-    {% if prompts %}
+    {% if threads_mode %}
+        {% if threads_error %}
+            <div class="alert alert-warning" role="alert">{{ threads_error }}</div>
+        {% elif threads_posts %}
+            {% include "fragments/threads-posts.html" %}
+        {% else %}
+            <div class="alert alert-light border" role="status">
+                No public Threads posts were found for the selected tags.
+            </div>
+        {% endif %}
+    {% elif prompts %}
         <section id="prompts" class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3"
                  data-masonry='{"percentPosition": true }'>
             {% with tags=prompt_query.tags %}

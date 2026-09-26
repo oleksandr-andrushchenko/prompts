@@ -1,3 +1,5 @@
+import threading
+import time
 from datetime import timedelta
 from urllib.parse import quote, urlparse
 
@@ -9,8 +11,134 @@ from shared_utils import (
     find_prompt_by_slug_follow_redirects, find_user_by_username_follow_redirects,
     verify_authorization, get_prompt_url, get_user_url, get_web_base_url, is_prod,
     get_auth_token_max_age, get_dynamodb_table, prompt_from_dynamodb,
-    query_dynamodb_table, Key, to_thread,
+    query_dynamodb_table, Key, to_thread, get_config,
 )
+
+THREADS_API_BASE = "https://graph.threads.net"
+THREADS_FIELDS = "id,media_type,permalink,username,text,timestamp,alt_text"
+THREADS_RESULTS_LIMIT = 12
+THREADS_TAG_LIMIT = 3
+_threads_cache: dict[tuple[str, str], tuple[float, list[dict[str, str | None]]]] = {}
+_threads_request_lock = threading.Lock()
+_threads_last_request_at = 0.0
+
+
+def _safe_threads_permalink(value) -> str | None:
+    if not isinstance(value, str):
+        return None
+    parsed = urlparse(value)
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not (
+            hostname == "threads.net" or hostname.endswith(".threads.net")):
+        return None
+    return value
+
+
+def _normalize_threads_post(value: dict, matched_tag: str) -> dict[str, str | None] | None:
+    permalink = _safe_threads_permalink(value.get("permalink"))
+    item_id = value.get("id")
+    if not permalink or not isinstance(item_id, str) or not item_id:
+        return None
+    return {
+        "id": item_id,
+        "username": value.get("username") if isinstance(value.get("username"), str) else None,
+        "text": value.get("text") if isinstance(value.get("text"), str) else None,
+        "timestamp": value.get("timestamp") if isinstance(value.get("timestamp"), str) else None,
+        "media_type": value.get("media_type") if isinstance(value.get("media_type"), str) else None,
+        "alt_text": value.get("alt_text") if isinstance(value.get("alt_text"), str) else None,
+        "permalink": permalink,
+        "matched_tag": matched_tag,
+    }
+
+
+def _get_threads_posts_for_tag(
+        tag: str,
+        search_type: str,
+        token: str,
+) -> list[dict[str, str | None]]:
+    global _threads_last_request_at
+
+    cache_key = (tag.casefold(), search_type)
+    now = time.monotonic()
+    cache_seconds = max(30.0, float(get_config().get("threads_cache_seconds", 300)))
+    cached = _threads_cache.get(cache_key)
+    if cached and now - cached[0] < cache_seconds:
+        return cached[1]
+
+    request_delay = max(
+        0.0,
+        float(get_config().get("threads_request_delay_seconds", 1)),
+    )
+    with _threads_request_lock:
+        remaining = request_delay - (time.monotonic() - _threads_last_request_at)
+        if remaining > 0:
+            time.sleep(remaining)
+        _threads_last_request_at = time.monotonic()
+        import httpx
+        response = httpx.get(
+            f"{THREADS_API_BASE}/keyword_search",
+            params={
+                "q": tag,
+                "search_mode": "KEYWORD",
+                "search_type": search_type,
+                "fields": THREADS_FIELDS,
+                "limit": THREADS_RESULTS_LIMIT,
+            },
+            headers={
+                "Authorization": f"Bearer {token}",
+                "User-Agent": "PromptCatalog/1.0",
+            },
+            timeout=10.0,
+            follow_redirects=True,
+        )
+
+    if response.status_code in {401, 403}:
+        raise PermissionError("Threads rejected the configured credentials or permissions")
+    if response.status_code == 429:
+        raise RuntimeError("Threads search is temporarily rate limited")
+    response.raise_for_status()
+    payload = response.json()
+    values = payload.get("data") or []
+    if not isinstance(values, list):
+        raise ValueError("Threads returned an invalid search response")
+    posts = []
+    for value in values:
+        if isinstance(value, dict) and (post := _normalize_threads_post(value, tag)):
+            posts.append(post)
+    _threads_cache[cache_key] = (time.monotonic(), posts)
+    return posts
+
+
+def get_hot_threads_posts(
+        tags: list[str],
+        search_type: str,
+) -> tuple[list[dict[str, str | None]], str | None]:
+    token = get_config().get("threads_access_token")
+    if not token:
+        return [], "Threads search is not configured."
+
+    unique_tags = list(dict.fromkeys(tag.strip() for tag in tags if tag.strip()))[:THREADS_TAG_LIMIT]
+    if not unique_tags:
+        return [], "Select at least one tag to search Threads."
+
+    posts = []
+    seen_ids = set()
+    try:
+        for tag in unique_tags:
+            for post in _get_threads_posts_for_tag(tag, search_type, token):
+                if post["id"] in seen_ids:
+                    continue
+                seen_ids.add(post["id"])
+                posts.append(post)
+                if len(posts) >= THREADS_RESULTS_LIMIT:
+                    return posts, None
+    except (PermissionError, RuntimeError, ValueError) as error:
+        logger.warning("Threads search unavailable: %s", error)
+        return [], "Threads results are temporarily unavailable."
+    except Exception:
+        logger.exception("Unexpected Threads search failure")
+        return [], "Threads results are temporarily unavailable."
+    return posts, None
 
 
 def get_login_redirect_url(callback_url: str) -> str:

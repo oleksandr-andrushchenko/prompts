@@ -211,6 +211,7 @@ deploy-infra: check-env check-aws ## Deploy CF stack for the site
 			TelegramBotToken="$(TELEGRAM_BOT_TOKEN)" \
 			TelegramChatId="$(TELEGRAM_CHAT_ID)" \
 			TelegramLogLevel="$(or $(TELEGRAM_LOG_LEVEL),INFO)" \
+			ThreadsAccessToken="$(THREADS_ACCESS_TOKEN)" \
 			NotificationEmail="$(NOTIFICATION_EMAIL)" \
 			NotificationPhone="$(NOTIFICATION_PHONE)" \
 			GoogleAnalyticsId="$(GOOGLE_ANALYTICS_ID)" \

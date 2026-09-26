@@ -44,6 +44,10 @@ Parameters:
     Type: String
     Default: INFO
     AllowedValues: [ 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'OFF' ]
+  ThreadsAccessToken:
+    Type: String
+    Default: ''
+    NoEcho: true
   NotificationEmail:
     Type: String
     Description: Email for contact form notifications
@@ -505,6 +509,7 @@ Resources:
           TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
           TELEGRAM_CHAT_ID: !Ref TelegramChatId
           TELEGRAM_LOG_LEVEL: !Ref TelegramLogLevel
+          THREADS_ACCESS_TOKEN: !Ref ThreadsAccessToken
           APP_STAGE: !Ref Stage
           APP_ENV: !Ref Env
           APP_DEBUG: !Ref Debug

@@ -498,6 +498,9 @@ def get_live_config():
         "js_cache_counter": os.getenv("JS_CACHE_COUNTER", 0),
         "auth_token_max_age": os.getenv("AUTH_TOKEN_MAX_AGE", 86_400 * 7),
         "auth_jwt_secret": os.getenv("AUTH_JWT_SECRET"),
+        "threads_access_token": os.getenv("THREADS_ACCESS_TOKEN"),
+        "threads_cache_seconds": os.getenv("THREADS_CACHE_SECONDS", 300),
+        "threads_request_delay_seconds": os.getenv("THREADS_REQUEST_DELAY_SECONDS", 1),
         "permission_hierarchy": {
             Permission.REGULAR: [
                 Permission.UPDATE_USER_IMPRESSION,

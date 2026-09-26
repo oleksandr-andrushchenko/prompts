@@ -5,7 +5,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Match
 
 from notifications import get_access_log
-from query_dtos import TagQueryDTO
+from query_dtos import PromptQueryType, TagQueryDTO
 from shared_deps import (
     OptCurUserDep,
     CurUserDep,
@@ -87,6 +87,7 @@ from web_utils import (
     get_user_tag_subscriptions,
     get_legacy_user_redirect_url,
     get_legacy_prompt_redirect_url,
+    get_hot_threads_posts,
 )
 
 app = Application()
@@ -102,6 +103,7 @@ async def robots_txt():
         "Allow: /\n"
         "Disallow: /login\n"
         "Disallow: /logout\n"
+        "Disallow: /*?*source=threads\n"
         f"Sitemap: {sitemap_base_url.rstrip('/')}/sitemap.xml\n"
     )
 
@@ -327,14 +329,22 @@ async def _prompt_page(prompt: PromptDep, cur_user: OptCurUserDep) -> HTMLRespon
     return HTMLResponse(html_content)
 
 
-async def _prompts_page(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> HTMLResponse:
+async def _prompts_page(
+        request: Request,
+        query_dto: PromptQueryDep,
+        cur_user: OptCurUserDep,
+) -> HTMLResponse:
     tag_slug = query_dto.tags[0] if query_dto.tags and len(query_dto.tags) == 1 else None
+    threads_mode = request.query_params.get("source") == "threads" and bool(query_dto.tags)
     (
         prompts,
         tag,
         prompt_query_tags,
     ) = await asyncio.gather(
-        to_thread(get_prompts, query_dto, cur_user),
+        (
+            asyncio.sleep(0, result=[])
+            if threads_mode else to_thread(get_prompts, query_dto, cur_user)
+        ),
         to_thread(find_tag, tag_slug) if tag_slug else asyncio.sleep(0, result=None),
         asyncio.gather(*(to_thread(find_tag, tag) for tag in query_dto.tags)),
     )
@@ -346,17 +356,39 @@ async def _prompts_page(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> H
         {"value": slug, "name": name}
         for slug, name in zip(query_dto.tags, prompt_query_tag_names)
     ]
-    return get_html_content("prompts.html", {
+    threads_posts = []
+    threads_error = None
+    if threads_mode:
+        threads_tag_names = [value.name for value in prompt_query_tags if value]
+        if threads_tag_names:
+            search_type = "TOP" if query_dto.type == PromptQueryType.POPULAR else "RECENT"
+            threads_posts, threads_error = await to_thread(
+                get_hot_threads_posts,
+                threads_tag_names,
+                search_type,
+            )
+        else:
+            threads_error = "Select at least one catalog tag to search Threads."
+    html_content = get_html_content("prompts.html", {
         "cur_user": cur_user,
         "prompt_query": query_dto,
         "prompt_query_tag_names": prompt_query_tag_names,
         "prompt_query_tag_items": prompt_query_tag_items,
         "prompts": prompts,
+        "threads_mode": threads_mode,
+        "threads_posts": threads_posts,
+        "threads_error": threads_error,
         "tag": tag,
         "category": find_category(query_dto.category) if query_dto.category else None,
         "tag_subscription": get_user_tag_subscription_for_tags(cur_user,
                                                                                query_dto.tags) if cur_user and query_dto.tags else None,
     })
+    if threads_mode:
+        return HTMLResponse(
+            html_content,
+            headers={"X-Robots-Tag": "noindex, nofollow"},
+        )
+    return html_content
 
 
 @route("get", "new-prompt", response_class=HTMLResponse)
@@ -370,8 +402,8 @@ async def new_prompt(cur_user: CurUserDep) -> str:
 
 
 @route("get", "prompts", response_class=HTMLResponse)
-async def prompts_page(query_dto: PromptQueryDep, cur_user: OptCurUserDep):
-    return await _prompts_page(query_dto, cur_user)
+async def prompts_page(request: Request, query_dto: PromptQueryDep, cur_user: OptCurUserDep):
+    return await _prompts_page(request, query_dto, cur_user)
 
 
 @route("get", "tags", response_class=HTMLResponse)
@@ -420,8 +452,12 @@ async def prompt_page_by_slugs(prompt: PromptBySlugsDep, cur_user: OptCurUserDep
 
 
 @route("get", "prompts-by-slugs", response_class=HTMLResponse)
-async def prompts_page_by_slugs(query_dto: PromptQueryBySlugsDep, cur_user: OptCurUserDep) -> HTMLResponse:
-    return await _prompts_page(query_dto, cur_user)
+async def prompts_page_by_slugs(
+        request: Request,
+        query_dto: PromptQueryBySlugsDep,
+        cur_user: OptCurUserDep,
+) -> HTMLResponse:
+    return await _prompts_page(request, query_dto, cur_user)
 
 
 def _legacy_prompts_redirect(request: Request) -> RedirectResponse:
