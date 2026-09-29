@@ -9,7 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(os.environ.get('PROJECT_ROOT', Path(__file__).resolve().parents[1])) / 'shared'))
 from prompt_contracts import extract_template_params, normalize_template_params
 from prompt_dtos import PromptDTO, UpdatePromptDTO
-from prompt_models import PROMPT_MODELS, PromptModel, get_prompt_model
+from prompt_models import PROMPT_MODELS, PromptCategory, PromptModel, get_prompt_model
 from shared_utils import prompt_from_dynamodb
 
 
@@ -32,6 +32,7 @@ def test_single_template_and_named_ports():
 
 def test_category_uses_internal_key():
     assert dto(category='design-image').category == 'design-image'
+    assert dto(category=PromptCategory.VIDEO).category == 'video'
     with pytest.raises(ValueError):
         dto(category='Design & Image')
 
@@ -71,10 +72,13 @@ def test_prompt_models_cover_prompts_chat_models_and_unknown_versions():
     upstream_models = {
         'gpt-5-*', 'nano-banana-pro', 'claude-4-5-opus',
         'gemini-3-pro', 'claude-4-5-sonnet', 'nano-banana',
-        'gemini-3', 'gpt-4o', 'grok-4', 'grok-3',
+        'gemini-3', 'gpt-4o', 'grok-4', 'grok-3', 'seedance 2.0', 'seedance 2.5',
         'claude-4-5-haiku', 'claude-4-opus', 'kling', 'dall-e-3',
         'gemini-2-5-pro', 'claude-3-5-sonnet', 'claude-4-sonnet',
-        'veo', 'o4-mini', 'runway-gen4', 'gemini-2-5-flash', 'sora 2',
+        'veo', 'o4-mini', 'runway-gen4', 'midjourney', 'gemini-2-5-flash', 'sora 2',
+        'deepseek', 'qwen', 'mistral', 'command-r', 'sonar', 'flux',
+        'stable diffusion', 'ideogram', 'recraft', 'adobe firefly',
+        'luma ray', 'pika', 'hailuo', 'wan', 'udio',
     }
 
     assert all(get_prompt_model(model) is not None for model in upstream_models)
@@ -87,6 +91,16 @@ def test_prompt_models_cover_prompts_chat_models_and_unknown_versions():
     assert get_prompt_model('claude-*') == PromptModel.CLAUDE_ANY
     assert get_prompt_model('gemini-*') == PromptModel.GEMINI_ANY
     assert get_prompt_model('llama-*') == PromptModel.LLAMA_ANY
+    assert get_prompt_model('seedance2.0') == PromptModel.SEEDANCE_2_0
+    assert get_prompt_model('seedance2.5') == PromptModel.SEEDANCE_2_5
+    assert get_prompt_model('Midjourney') == PromptModel.MIDJOURNEY
+    assert get_prompt_model('Midjourney v7') == PromptModel.MIDJOURNEY_ANY
+    assert get_prompt_model('DeepSeek V3') == PromptModel.DEEPSEEK_ANY
+    assert get_prompt_model('Qwen-3') == PromptModel.QWEN_ANY
+    assert get_prompt_model('FLUX 1.1 Pro') == PromptModel.FLUX_ANY
+    assert get_prompt_model('Stable Diffusion XL') == PromptModel.STABLE_DIFFUSION_ANY
+    assert get_prompt_model('Hailuo 02') == PromptModel.HAILUO_ANY
+    assert get_prompt_model('Wan 2.2') == PromptModel.WAN_ANY
     assert len(PROMPT_MODELS) == len(set(PROMPT_MODELS))
 
 

@@ -3,6 +3,7 @@ from enum import StrEnum
 
 class PromptCategory(StrEnum):
     DESIGN_IMAGE = "design-image"
+    VIDEO = "video"
     SOCIAL_MEDIA = "social-media"
     WRITING_EDITING = "writing-editing"
     DATA_ANALYTICS = "data-analytics"
@@ -42,6 +43,7 @@ class PromptCategory(StrEnum):
 
 PROMPT_CATEGORY_LABELS = {
     PromptCategory.DESIGN_IMAGE: "Design & Image",
+    PromptCategory.VIDEO: "Video",
     PromptCategory.SOCIAL_MEDIA: "Social Media",
     PromptCategory.WRITING_EDITING: "Writing & Editing",
     PromptCategory.DATA_ANALYTICS: "Data & Analytics",
@@ -147,14 +149,34 @@ class PromptModel(StrEnum):
 
     LLAMA_ANY = "meta-llama-*"
     LLAMA_3_1_70B = "meta-llama-3-1-70b"
+    DEEPSEEK_ANY = "deepseek-*"
+    QWEN_ANY = "alibaba-qwen-*"
+    MISTRAL_ANY = "mistral-*"
+    COMMAND_ANY = "cohere-command-*"
+    SONAR_ANY = "perplexity-sonar-*"
 
     KLING_ANY = "kling-*"
     KLING = "kling"
     RUNWAY_ANY = "runway-*"
     RUNWAY_GEN4 = "runway-gen4"
+    MIDJOURNEY_ANY = "midjourney-*"
+    MIDJOURNEY = "midjourney"
+    FLUX_ANY = "black-forest-labs-flux-*"
+    STABLE_DIFFUSION_ANY = "stability-ai-stable-diffusion-*"
+    IDEOGRAM_ANY = "ideogram-*"
+    RECRAFT_ANY = "recraft-*"
+    FIREFLY_ANY = "adobe-firefly-*"
+    SEEDANCE_ANY = "bytedance-seedance-*"
+    SEEDANCE_2_0 = "bytedance-seedance-2-0"
+    SEEDANCE_2_5 = "bytedance-seedance-2-5"
+    LUMA_RAY_ANY = "luma-ray-*"
+    PIKA_ANY = "pika-*"
+    HAILUO_ANY = "minimax-hailuo-*"
+    WAN_ANY = "alibaba-wan-*"
 
     ELEVENLABS_ANY = "elevenlabs-*"
     SUNO_ANY = "suno-*"
+    UDIO_ANY = "udio-*"
 
 
 PROMPT_MODELS = tuple(PromptModel)
@@ -208,12 +230,56 @@ PROMPT_MODEL_ALIASES = {
     "grok-4": PromptModel.GROK_4,
     "llama-*": PromptModel.LLAMA_ANY,
     "llama-3-1-70b": PromptModel.LLAMA_3_1_70B,
+    "deepseek": PromptModel.DEEPSEEK_ANY,
+    "deepseek-*": PromptModel.DEEPSEEK_ANY,
+    "qwen": PromptModel.QWEN_ANY,
+    "qwen-*": PromptModel.QWEN_ANY,
+    "mistral": PromptModel.MISTRAL_ANY,
+    "mistral-*": PromptModel.MISTRAL_ANY,
+    "command": PromptModel.COMMAND_ANY,
+    "command-*": PromptModel.COMMAND_ANY,
+    "command-r": PromptModel.COMMAND_ANY,
+    "command-r-plus": PromptModel.COMMAND_ANY,
+    "sonar": PromptModel.SONAR_ANY,
+    "sonar-*": PromptModel.SONAR_ANY,
     "kling-*": PromptModel.KLING_ANY,
     "kling": PromptModel.KLING,
     "runway-*": PromptModel.RUNWAY_ANY,
     "runway-gen4": PromptModel.RUNWAY_GEN4,
+    "midjourney-*": PromptModel.MIDJOURNEY_ANY,
+    "midjourney": PromptModel.MIDJOURNEY,
+    "flux": PromptModel.FLUX_ANY,
+    "flux-*": PromptModel.FLUX_ANY,
+    "stable diffusion": PromptModel.STABLE_DIFFUSION_ANY,
+    "stable-diffusion-*": PromptModel.STABLE_DIFFUSION_ANY,
+    "ideogram": PromptModel.IDEOGRAM_ANY,
+    "ideogram-*": PromptModel.IDEOGRAM_ANY,
+    "recraft": PromptModel.RECRAFT_ANY,
+    "recraft-*": PromptModel.RECRAFT_ANY,
+    "firefly": PromptModel.FIREFLY_ANY,
+    "firefly-*": PromptModel.FIREFLY_ANY,
+    "adobe firefly": PromptModel.FIREFLY_ANY,
+    "seedance-*": PromptModel.SEEDANCE_ANY,
+    "seedance 2.0": PromptModel.SEEDANCE_2_0,
+    "seedance2.0": PromptModel.SEEDANCE_2_0,
+    "seedance-2.0": PromptModel.SEEDANCE_2_0,
+    "seedance-2-0": PromptModel.SEEDANCE_2_0,
+    "seedance 2.5": PromptModel.SEEDANCE_2_5,
+    "seedance2.5": PromptModel.SEEDANCE_2_5,
+    "seedance-2.5": PromptModel.SEEDANCE_2_5,
+    "seedance-2-5": PromptModel.SEEDANCE_2_5,
+    "luma ray": PromptModel.LUMA_RAY_ANY,
+    "luma-ray-*": PromptModel.LUMA_RAY_ANY,
+    "pika": PromptModel.PIKA_ANY,
+    "pika-*": PromptModel.PIKA_ANY,
+    "hailuo": PromptModel.HAILUO_ANY,
+    "hailuo-*": PromptModel.HAILUO_ANY,
+    "wan": PromptModel.WAN_ANY,
+    "wan-*": PromptModel.WAN_ANY,
     "elevenlabs-*": PromptModel.ELEVENLABS_ANY,
     "suno-*": PromptModel.SUNO_ANY,
+    "udio": PromptModel.UDIO_ANY,
+    "udio-*": PromptModel.UDIO_ANY,
 }
 
 
@@ -248,10 +314,52 @@ PROMPT_MODEL_PREFIX_ALIASES = (
     ("grok-", PromptModel.GROK_ANY),
     ("meta-llama-", PromptModel.LLAMA_ANY),
     ("llama-", PromptModel.LLAMA_ANY),
+    ("deepseek-", PromptModel.DEEPSEEK_ANY),
+    ("deepseek ", PromptModel.DEEPSEEK_ANY),
+    ("alibaba-qwen-", PromptModel.QWEN_ANY),
+    ("qwen-", PromptModel.QWEN_ANY),
+    ("qwen ", PromptModel.QWEN_ANY),
+    ("mistral-", PromptModel.MISTRAL_ANY),
+    ("mistral ", PromptModel.MISTRAL_ANY),
+    ("cohere-command-", PromptModel.COMMAND_ANY),
+    ("command-", PromptModel.COMMAND_ANY),
+    ("command ", PromptModel.COMMAND_ANY),
+    ("perplexity-sonar-", PromptModel.SONAR_ANY),
+    ("sonar-", PromptModel.SONAR_ANY),
+    ("sonar ", PromptModel.SONAR_ANY),
     ("kling-", PromptModel.KLING_ANY),
     ("runway-", PromptModel.RUNWAY_ANY),
+    ("midjourney-", PromptModel.MIDJOURNEY_ANY),
+    ("midjourney ", PromptModel.MIDJOURNEY_ANY),
+    ("black-forest-labs-flux-", PromptModel.FLUX_ANY),
+    ("flux-", PromptModel.FLUX_ANY),
+    ("flux ", PromptModel.FLUX_ANY),
+    ("stability-ai-stable-diffusion-", PromptModel.STABLE_DIFFUSION_ANY),
+    ("stable-diffusion-", PromptModel.STABLE_DIFFUSION_ANY),
+    ("stable diffusion ", PromptModel.STABLE_DIFFUSION_ANY),
+    ("ideogram-", PromptModel.IDEOGRAM_ANY),
+    ("ideogram ", PromptModel.IDEOGRAM_ANY),
+    ("recraft-", PromptModel.RECRAFT_ANY),
+    ("recraft ", PromptModel.RECRAFT_ANY),
+    ("adobe-firefly-", PromptModel.FIREFLY_ANY),
+    ("adobe firefly ", PromptModel.FIREFLY_ANY),
+    ("firefly-", PromptModel.FIREFLY_ANY),
+    ("bytedance-seedance-", PromptModel.SEEDANCE_ANY),
+    ("seedance-", PromptModel.SEEDANCE_ANY),
+    ("luma-ray-", PromptModel.LUMA_RAY_ANY),
+    ("luma ray ", PromptModel.LUMA_RAY_ANY),
+    ("pika-", PromptModel.PIKA_ANY),
+    ("pika ", PromptModel.PIKA_ANY),
+    ("minimax-hailuo-", PromptModel.HAILUO_ANY),
+    ("hailuo-", PromptModel.HAILUO_ANY),
+    ("hailuo ", PromptModel.HAILUO_ANY),
+    ("alibaba-wan-", PromptModel.WAN_ANY),
+    ("wan-", PromptModel.WAN_ANY),
+    ("wan ", PromptModel.WAN_ANY),
     ("elevenlabs-", PromptModel.ELEVENLABS_ANY),
     ("suno-", PromptModel.SUNO_ANY),
+    ("udio-", PromptModel.UDIO_ANY),
+    ("udio ", PromptModel.UDIO_ANY),
 )
 
 
