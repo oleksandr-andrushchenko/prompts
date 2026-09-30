@@ -51,7 +51,8 @@
         <label for="name" class="col-form-label col-2 label-required">Name</label>
         <div class="col-10">
             <input type="text" class="form-control" id="name" name="name" placeholder="Name"
-                   value="{{ tag.name if tag and tag.name else "" }}">
+                   value="{{ tag.name }}">
+            <div class="form-text">Slug: <code>{{ tag.slug }}</code></div>
         </div>
     </div>
 

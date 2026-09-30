@@ -1,4 +1,9 @@
 <form class="d-flex flex-column gap-3" id="category-form" novalidate>
+    <div>
+        <label for="name" class="form-label label-required">Name</label>
+        <input type="text" class="form-control" id="name" name="name" value="{{ category.name }}">
+        <div class="form-text">Slug: <code>{{ category.slug }}</code></div>
+    </div>
     <div class="row align-items-center g-3">
         <div class="col-4 col-md-2">
             {% if category.image_filename %}
@@ -36,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
   handleFormSubmit("#category-form", {{ url('update-category', slug=category.slug, absolute=True)|tojson }}, {
     method: "PATCH",
     rules: {
+      name: [{rule: "required"}, {rule: "minLength", value: 2}, {rule: "maxLength", value: 80}],
       description: [{rule: "required"}, {rule: "minLength", value: 10}, {rule: "maxLength", value: 500}],
       image_file: [
         {rule: "required", errorMessage: "Cover image is required"},

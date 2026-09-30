@@ -1068,16 +1068,9 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
         "image_filename": None,
     })
     assert rename_tag_success.status_code == 200, rename_tag_success.text
-    renamed_old_tag_page = get(
-        guest_client,
-        "/prompts?type=latest&status=published&tags=coverage-tag",
-        allow_redirects=False,
-    )
-    assert renamed_old_tag_page.status_code == 308
-    assert "coverage-tag-updated" in renamed_old_tag_page.headers["location"]
-    renamed_current_tag_page = get(guest_client, "/prompts?type=latest&status=published&tags=coverage-tag-updated")
-    assert renamed_current_tag_page.status_code == 200
-    assert "Updated functional endpoint coverage prompt" in pq(renamed_current_tag_page.text)("#prompts").text()
+    current_tag_page = get(guest_client, "/prompts?type=latest&status=published&tags=coverage-tag")
+    assert current_tag_page.status_code == 200
+    assert "Updated functional endpoint coverage prompt" in pq(current_tag_page.text)("#prompts").text()
 
     status_failure = prompt(root_client, f"/prompts/{prompt_id}/status", json={"status": "invalid"})
     assert status_failure.status_code == 422
@@ -1137,6 +1130,14 @@ def test_categories_page_and_admin_update_endpoints(guest_client):
         "image_action": "keep",
     })
     assert update_failure.status_code == 403
+    editable_name = patch(root_client, "/categories/code-dev", json={"name": "Programming"})
+    assert editable_name.status_code == 200, editable_name.text
+    category_item = dynamodb_table.get_item(Key={"pk": "CATEGORY", "sk": "code-dev"})["Item"]
+    assert category_item["name"] == "Programming"
+    invalid_name = patch(root_client, "/categories/code-dev", json={"name": "X"})
+    assert invalid_name.status_code == 422
+    immutable_slug = patch(root_client, "/categories/code-dev", json={"slug": "programming"})
+    assert immutable_slug.status_code == 422
 
 
 def test_prompt_impression_comment_and_comment_update_endpoints_success_and_failure(guest_client):
@@ -1298,11 +1299,13 @@ def test_tag_edit_and_update_endpoints_success_and_failure():
         "image_filename": None,
     })
     assert update_success.status_code == 200, update_success.text
-    update_failure = patch(root_client, "/tags/functional-tag-updated", json={
-        "name": "X",
-        "image_action": "keep",
-    })
-    assert update_failure.status_code == 422
+    updated_tag_page = get(root_client, "/tags/functional-tag/edit")
+    assert updated_tag_page.status_code == 200
+    assert "Functional Tag Updated" in updated_tag_page.text
+    invalid_name = patch(root_client, "/tags/functional-tag", json={"name": "X"})
+    assert invalid_name.status_code == 422
+    immutable_slug = patch(root_client, "/tags/functional-tag", json={"slug": "functional-tag-updated"})
+    assert immutable_slug.status_code == 422
 
 
 def test_admin_page_sitemap_and_cache_endpoints_success_and_failure(guest_client):
@@ -1320,8 +1323,8 @@ def test_admin_page_sitemap_and_cache_endpoints_success_and_failure(guest_client
     sitemap = get(guest_client, "/sitemap.xml")
     assert sitemap.status_code == 200
     assert "/tags" in sitemap.text
-    assert "/functional-tag-updated/prompts" in sitemap.text
-    assert "/popular/functional-tag-updated/prompts" in sitemap.text
+    assert "/functional-tag/prompts" in sitemap.text
+    assert "/popular/functional-tag/prompts" in sitemap.text
     assert "/Functional Tag Updated/prompts" not in sitemap.text
     sitemap_failure = prompt(regular_client, "/generate-sitemap", json={})
     assert sitemap_failure.status_code == 403

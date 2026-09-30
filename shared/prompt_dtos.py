@@ -157,14 +157,20 @@ class UpdatePromptDTO(BaseDTO):
 
 @dataclass(slots=True)
 class UpdateTagDTO(BaseDTO):
-    name: str | None | object = UNSET
+    name: str | object = UNSET
+    slug: str | object = UNSET
     image_action: str | None | object = UNSET
     image_filename: str | None | object = UNSET
 
     def __post_init__(self):
         if self.name is not UNSET:
-            if self.name is None or not 2 <= len(self.name) <= 40:
+            if self.name is None:
                 raise ValueError("name must contain between 2 and 40 characters")
+            self.name = self.name.strip()
+            if not 2 <= len(self.name) <= 40:
+                raise ValueError("name must contain between 2 and 40 characters")
+        if self.slug is not UNSET:
+            raise ValueError("tag slug is immutable")
         if self.image_action is not UNSET and self.image_action not in (None, "delete", "replace", "keep"):
             raise ValueError("invalid image action")
 

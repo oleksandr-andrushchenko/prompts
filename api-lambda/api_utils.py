@@ -375,14 +375,6 @@ def update_tag(tag: Tag, update_tag_dto: UpdateTagDTO, cur_user: User) -> None:
     if not changes:
         return
 
-    now = utc_now()
-
-    new_name = changes.pop("name", None)
-    if new_name is not None:
-        new_name = new_name.strip()
-        if new_name != tag.name:
-            changes["name"] = new_name
-
     image_action = changes.pop("image_action", "keep")
 
     if image_action == "delete":
@@ -394,51 +386,12 @@ def update_tag(tag: Tag, update_tag_dto: UpdateTagDTO, cur_user: User) -> None:
         return
 
     old_image = tag.image_filename
-    old_slug = tag.slug
-    slug = to_kebab_case(changes["name"]) if "name" in changes else old_slug
-    slug_changed = slug != old_slug
     transacts = []
-
-    if slug_changed:
-        old_item = get_dynamodb_item(f"TAG#{old_slug}", "META")
-        if old_item is None:
-            raise TagNotFoundError(f"Tag '{old_slug}' not found")
-
-        new_item = {k: v for k, v in old_item.items() if k not in {"pk", "sk"}}
-        new_item.update(changes)
-        new_item["tag_name_sk"] = slug
-        new_item["updated_at"] = now
-
-        redirect_item = {
-            "tag_name_sk": old_slug,
-            "redirect_to": slug,
-            "created_at": now,
-        }
-        add_dynamodb_put_transact(transacts, (f"TAG_REDIRECT#{old_slug}", "META"), redirect_item, new_pk_only=True)
-        add_dynamodb_put_transact(transacts, (f"TAG#{slug}", "META"), new_item, new_pk_only=True)
-        add_dynamodb_delete_transact(transacts, (f"TAG#{old_slug}", "META"))
-
-        for prompt in get_latest_prompts_by_tags(PromptQueryDTO(tags=[old_slug], limit=1000)):
-            old_tags = list(prompt.tags)
-            tags = list(dict.fromkeys(slug if tag == old_slug else tag for tag in old_tags))
-
-            add_delete_tag_combos_transact(transacts, prompt, old_slug)
-            add_dynamodb_prompt_update_transact(transacts, prompt, {"tags": tags})
-            add_put_tag_combos_transact(transacts, prompt, slug)
-    else:
-        add_dynamodb_tag_update_transact(transacts, tag, changes)
-
-    try:
-        dynamodb_transact_write(transacts)
-    except DynamoDBTransactionError as e:
-        if e.is_conditional():
-            raise SlugDuplicationError(field="name")
-        raise
+    add_dynamodb_tag_update_transact(transacts, tag, changes)
+    dynamodb_transact_write(transacts)
 
     if "name" in changes:
         tag.name = changes["name"]
-    if slug_changed:
-        tag.slug = slug
     if "image_filename" in changes:
         tag.image_filename = changes["image_filename"]
 
