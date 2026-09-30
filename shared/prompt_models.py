@@ -1,82 +1,6 @@
 from enum import StrEnum
 
 
-class PromptCategory(StrEnum):
-    DESIGN_IMAGE = "design-image"
-    VIDEO = "video"
-    SOCIAL_MEDIA = "social-media"
-    WRITING_EDITING = "writing-editing"
-    DATA_ANALYTICS = "data-analytics"
-    PHOTOGRAPHY = "photography"
-    MARKETING = "marketing"
-    PRODUCTIVITY = "productivity"
-    EMAIL_OUTREACH = "email-outreach"
-    CODE_DEV = "code-dev"
-    BUSINESS_OPS = "business-ops"
-    EDUCATION = "education"
-    PRODUCT_UX = "product-ux"
-    HR_PEOPLE = "hr-people"
-    CREATIVE_WRITING = "creative-writing"
-    RESEARCH_DATA = "research-data"
-    SALES_CRM = "sales-crm"
-    CUSTOMER_SUPPORT = "customer-support"
-    SEO_GROWTH = "seo-growth"
-    ECOMMERCE_RETAIL = "ecommerce-retail"
-    SCIENCE = "science"
-    GAMING = "gaming"
-    MUSIC_AUDIO = "music-audio"
-    ART_ILLUSTRATION = "art-illustration"
-    LANGUAGES_TRANSLATION = "languages-translation"
-    AI_AGENTS_AUTOMATION = "ai-agents-automation"
-    OTHER = "other"
-
-    @property
-    def label(self) -> str:
-        return PROMPT_CATEGORY_LABELS[self]
-
-    @property
-    def description(self) -> str:
-        return PROMPT_CATEGORY_DESCRIPTIONS.get(
-            self, f"Explore {self.label.lower()} prompts and reusable workflows."
-        )
-
-
-PROMPT_CATEGORY_LABELS = {
-    PromptCategory.DESIGN_IMAGE: "Design & Image",
-    PromptCategory.VIDEO: "Video",
-    PromptCategory.SOCIAL_MEDIA: "Social Media",
-    PromptCategory.WRITING_EDITING: "Writing & Editing",
-    PromptCategory.DATA_ANALYTICS: "Data & Analytics",
-    PromptCategory.PHOTOGRAPHY: "Photography",
-    PromptCategory.MARKETING: "Marketing",
-    PromptCategory.PRODUCTIVITY: "Productivity",
-    PromptCategory.EMAIL_OUTREACH: "Email & Outreach",
-    PromptCategory.CODE_DEV: "Code & Dev",
-    PromptCategory.BUSINESS_OPS: "Business & Ops",
-    PromptCategory.EDUCATION: "Education",
-    PromptCategory.PRODUCT_UX: "Product & UX",
-    PromptCategory.HR_PEOPLE: "HR & People",
-    PromptCategory.CREATIVE_WRITING: "Creative Writing",
-    PromptCategory.RESEARCH_DATA: "Research & Data",
-    PromptCategory.SALES_CRM: "Sales & CRM",
-    PromptCategory.CUSTOMER_SUPPORT: "Customer Support",
-    PromptCategory.SEO_GROWTH: "SEO & Growth",
-    PromptCategory.ECOMMERCE_RETAIL: "E-commerce & Retail",
-    PromptCategory.SCIENCE: "Science",
-    PromptCategory.GAMING: "Gaming",
-    PromptCategory.MUSIC_AUDIO: "Music & Audio",
-    PromptCategory.ART_ILLUSTRATION: "Art & Illustration",
-    PromptCategory.LANGUAGES_TRANSLATION: "Languages & Translation",
-    PromptCategory.AI_AGENTS_AUTOMATION: "AI Agents & Automation",
-    PromptCategory.OTHER: "Other",
-}
-
-PROMPT_CATEGORY_DESCRIPTIONS = {
-    category: f"Explore {label.lower()} prompts, templates, and reusable workflows."
-    for category, label in PROMPT_CATEGORY_LABELS.items()
-}
-
-
 class PromptFormat(StrEnum):
     TEXT = "text"
     IMAGE = "image"
@@ -92,7 +16,6 @@ class PromptFormat(StrEnum):
     CODE = "code"
 
 
-PROMPT_CATEGORIES = tuple(PromptCategory)
 PROMPT_FORMATS = tuple(PromptFormat)
 PROMPT_TEMPLATE_FORMATS = tuple(value for value in PromptFormat if value not in (
     PromptFormat.IMAGE, PromptFormat.VIDEO, PromptFormat.AUDIO, PromptFormat.DOCUMENT,

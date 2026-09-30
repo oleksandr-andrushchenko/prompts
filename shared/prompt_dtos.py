@@ -3,9 +3,10 @@ from enum import StrEnum
 from urllib.parse import urlsplit
 
 from basic_dtos import BaseDTO, UNSET
-from prompt_models import PromptCategory, get_prompt_model
+from prompt_models import get_prompt_model
 from prompt_contracts import validate_template, validate_ports
 from query_dtos import PromptStatus
+from validation import validate_category_slug
 
 
 def _validate_tags(values):
@@ -34,7 +35,7 @@ def _validate_description(value):
 
 def _validate_category(value):
     try:
-        return PromptCategory(value).value
+        return validate_category_slug(value)
     except (TypeError, ValueError):
         raise ValueError(f"unsupported prompt category: {value}") from None
 

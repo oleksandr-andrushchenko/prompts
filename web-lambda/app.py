@@ -17,7 +17,7 @@ from shared_deps import (
     TagQueryDep,
     CategoryDep,
 )
-from shared_utils import find_category, get_categories, get_static_base_url, get_tags, get_web_base_url
+from shared_utils import find_category, get_categories, get_category, get_static_base_url, get_tags, get_web_base_url
 from web import (
     Application,
     Request,
@@ -308,11 +308,13 @@ async def _prompt_page(prompt: PromptDep, cur_user: OptCurUserDep) -> HTMLRespon
         prompt_impression,
         related_prompts,
         comments,
+        category,
     ) = await asyncio.gather(
         to_thread(find_user, prompt.user_id),
         to_thread(find_prompt_impression, prompt, cur_user) if cur_user else asyncio.sleep(0, result=None),
         get_prompt_related_prompts(prompt),
         to_thread(get_prompt_comments, prompt),
+        to_thread(get_category, prompt.category),
     )
 
     html_content = get_html_content("prompt.html", {
@@ -322,6 +324,7 @@ async def _prompt_page(prompt: PromptDep, cur_user: OptCurUserDep) -> HTMLRespon
         "prompt_impression": prompt_impression,
         "related_prompts": related_prompts,
         "comments": comments,
+        "category": category,
         "comments_query": PromptCommentQueryDTO()
     })
     return HTMLResponse(html_content)
@@ -365,7 +368,8 @@ async def new_prompt(cur_user: CurUserDep) -> str:
     if cur_user.status == UserStatus.BANNED:
         raise UserBannedError
     return get_html_content("new-prompt.html", {
-        "cur_user": cur_user
+        "cur_user": cur_user,
+        "categories": get_categories(),
     })
 
 
@@ -404,7 +408,8 @@ async def edit_prompt(prompt: PromptDep, cur_user: CurUserDep) -> str:
         raise UserBannedError
     return get_html_content("edit-prompt.html", {
         "cur_user": cur_user,
-        "prompt": prompt
+        "prompt": prompt,
+        "categories": get_categories(),
     })
 
 

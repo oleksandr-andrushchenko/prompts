@@ -9,7 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(os.environ.get('PROJECT_ROOT', Path(__file__).resolve().parents[1])) / 'shared'))
 from prompt_contracts import extract_template_params, normalize_template_params
 from prompt_dtos import PromptDTO, UpdatePromptDTO
-from prompt_models import PROMPT_MODELS, PromptCategory, PromptModel, get_prompt_model
+from prompt_models import PROMPT_MODELS, PromptModel, get_prompt_model
 from shared_utils import prompt_from_dynamodb
 
 
@@ -32,7 +32,7 @@ def test_single_template_and_named_ports():
 
 def test_category_uses_internal_key():
     assert dto(category='design-image').category == 'design-image'
-    assert dto(category=PromptCategory.VIDEO).category == 'video'
+    assert dto(category='video').category == 'video'
     with pytest.raises(ValueError):
         dto(category='Design & Image')
 
@@ -156,7 +156,6 @@ def test_unified_result_files():
     value = prompt_from_dynamodb(item)
     assert value.result_files == files + [{'filename': 'speech.mp3', 'format': 'audio'}]
     assert value.category == 'code-dev'
-    assert value.category_label == 'Code & Dev'
 
 
 def test_old_prompt_records_derive_params_from_template():

@@ -69,8 +69,8 @@ class ExceptionHandlerTests(unittest.TestCase):
                      "aws_request_id": "request-123"}
             # The harness includes only access logging middleware; supply the renderer with
             # the template paths and request context normally set by the web app.
-            with patch.dict(os.environ, {
-                "FUNCTION_TEMPLATES_DIR": str(project_root / "web-lambda/templates"),
+            with patch.dict(shared_utils.config, {
+                "function_templates_dir": str(project_root / "web-lambda/templates"),
             }):
                 templates = shared_utils.get_jinja2_env()
             templates.globals["request"] = Request(scope)

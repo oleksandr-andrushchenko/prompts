@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 
-from prompt_models import PromptCategory
+from validation import validate_category_slug
 
 
 @dataclass(slots=True)
@@ -109,7 +109,7 @@ class PromptQueryDTO(BaseQueryDTO):
         self.type = PromptQueryType(self.type)
         self.status = PromptStatus(self.status)
         if self.category is not None:
-            self.category = PromptCategory(self.category).value
+            self.category = validate_category_slug(self.category)
 
     def has_params(self):
         return BaseQueryDTO.has_params(self) or bool(

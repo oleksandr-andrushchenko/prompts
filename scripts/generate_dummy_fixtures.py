@@ -13,6 +13,7 @@ from api_utils import (
     UserImpressionAction,
     create_prompt,
     create_prompt_comment,
+    create_category,
     create_tag_subscription,
     find_tag,
     get_dummy_user_token,
@@ -105,6 +106,17 @@ def create_dummy_fixtures(req=None) -> None:
     created_users.append(root_user)
     update_dynamodb_item((f"USER#{root_user.id}", "META"), {"permissions": [Permission.ROOT]})
     root_user.permissions = [Permission.ROOT]
+    for slug, name in (
+        ("code-dev", "Code & Dev"),
+        ("design-image", "Design & Image"),
+        ("other", "Other"),
+    ):
+        create_category(
+            slug,
+            name,
+            f"Explore {name.lower()} prompts, templates, and reusable workflows.",
+            root_user,
+        )
     update_user_dto = UpdateUserDTO(
         name="John Doe",
         avatar_action="replace",

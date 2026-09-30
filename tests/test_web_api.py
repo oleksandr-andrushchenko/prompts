@@ -318,6 +318,16 @@ def check_index(doc):
 @pytest.fixture(scope="session", autouse=True)
 def setup_dynamodb():
     recreate_dynamodb_table()
+    for slug, name in (("code-dev", "Code & Dev"), ("design-image", "Design & Image")):
+        dynamodb_table.put_item(Item={
+            "pk": "CATEGORY",
+            "sk": slug,
+            "category_slug": slug,
+            "name": name,
+            "description": f"Explore {name.lower()} prompts, templates, and reusable workflows.",
+            "published_prompts_count": 0,
+            "created_at": int(time.time() * 1000),
+        })
 
 
 @pytest.fixture(scope="session")
@@ -842,7 +852,7 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     functional_state["prompt_id"] = prompt_item["id"]
     functional_state["prompt_slug"] = prompt_item["prompt_slug"]
     functional_state["code_dev_count_before_publish"] = dynamodb_table.get_item(
-        Key={"pk": "CATEGORY#code-dev", "sk": "META"}
+        Key={"pk": "CATEGORY", "sk": "code-dev"}
     ).get("Item", {}).get("published_prompts_count", 0)
     scoped_slug_item = dynamodb_table.get_item(Key={
         "pk": f"PROMPT_SLUG#{prompt_item['user_id']}#{prompt_item['prompt_slug']}",
@@ -1089,7 +1099,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert category_prompt_page.status_code == 200
     assert "Updated functional endpoint coverage prompt" in pq(category_prompt_page.text)("#prompts").text()
     category_item = dynamodb_table.get_item(
-        Key={"pk": "CATEGORY#code-dev", "sk": "META"}
+        Key={"pk": "CATEGORY", "sk": "code-dev"}
     )["Item"]
     assert category_item["published_prompts_count"] == (
         functional_state["code_dev_count_before_publish"] + 1

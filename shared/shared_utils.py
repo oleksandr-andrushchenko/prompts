@@ -16,19 +16,18 @@ from decimal import Decimal
 from enum import StrEnum
 from functools import lru_cache, partial
 from html import unescape
-from pathlib import Path
 from typing import Callable, TypeVar, Any
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from api_route_metadata import API_URL_ROUTES
+from app_config import config, get_config
 from basic_dtos import UserTokenDTO
 from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
 from notifications import configure_telegram_logging
 from prompt_contracts import extract_template_params, normalize_template_params
 from prompt_dtos import (PromptCommentImpressionAction, PromptImpressionAction)
-from prompt_models import PROMPT_CATEGORIES, PROMPT_MODELS, PROMPT_FORMATS, PROMPT_TEMPLATE_FORMATS, PromptCategory, \
-    PromptModel, get_prompt_model
+from prompt_models import PROMPT_MODELS, PROMPT_FORMATS, PROMPT_TEMPLATE_FORMATS, PromptModel, get_prompt_model
 from query_dtos import (BaseQueryDTO, PromptCommentQueryDTO, PromptQueryDTO, PromptQueryType, PromptStatus,
                         TagQueryDTO, TagQueryType, UserQueryDTO, UserQueryType, UserStatus)
 from tag_subscription_dtos import TagSubscription
@@ -277,10 +276,6 @@ class Prompt:
     result_files: list[dict[str, str]] = field(default_factory=list)
     params: list[dict[str, str]] = field(default_factory=list)
 
-    @property
-    def category_label(self) -> str:
-        return PromptCategory(self.category).label
-
 
 @dataclass(slots=True)
 class PromptPublishedEvent:
@@ -471,87 +466,8 @@ class UserByOldSlugRequestedError(Exception):
         self.user = user
 
 
-def get_live_config():
-    return {
-        "app_stage": os.getenv("APP_STAGE"),
-        "app_env": os.getenv("APP_ENV"),
-        "app_debug": os.getenv("APP_DEBUG"),
-        "app_secret": os.getenv("APP_SECRET"),
-        "web_base_url": os.getenv("WEB_BASE_URL"),
-        "api_base_url": os.getenv("API_BASE_URL"),
-        "static_base_url": os.getenv("STATIC_BASE_URL"),
-        "aws_region": os.getenv("AWS_REGION"),
-        "dynamodb_endpoint": os.getenv("DYNAMODB_ENDPOINT"),
-        "dynamodb_table": os.getenv("DYNAMODB_TABLE"),
-        "google_analytics_id": os.getenv("GOOGLE_ANALYTICS_ID"),
-        "tinymce_api_key": os.getenv("TINYMCE_API_KEY"),
-        "contact_topic_arn": os.getenv("CONTACT_TOPIC_ARN"),
-        "ses_from_email": os.getenv("SES_FROM_EMAIL"),
-        "allowed_origin": os.getenv("ALLOWED_ORIGIN"),
-        "cognito_domain": os.getenv("COGNITO_DOMAIN"),
-        "cognito_client_id": os.getenv("COGNITO_CLIENT_ID"),
-        "cognito_client_secret": os.getenv("COGNITO_CLIENT_SECRET"),
-        "cognito_user_pool_id": os.getenv("COGNITO_USER_POOL_ID"),
-        "email_files_dir": os.getenv("EMAIL_FILES_DIR", "/app-emails"),
-        "static_files_dir": os.getenv("STATIC_FILES_DIR", "/app-static"),
-        "css_cache_counter": os.getenv("CSS_CACHE_COUNTER", 0),
-        "js_cache_counter": os.getenv("JS_CACHE_COUNTER", 0),
-        "auth_token_max_age": os.getenv("AUTH_TOKEN_MAX_AGE", 86_400 * 7),
-        "auth_jwt_secret": os.getenv("AUTH_JWT_SECRET"),
-        "permission_hierarchy": {
-            Permission.REGULAR: [
-                Permission.UPDATE_USER_IMPRESSION,
-                Permission.CREATE_PROMPT,
-                Permission.UPDATE_PROMPT_IMPRESSION,
-                Permission.CREATE_PROMPT_COMMENT,
-                Permission.CREATE_CONTACT_MESSAGE,
-            ],
-            Permission.ROOT: [
-                Permission.ALL
-            ],
-        },
-        "default_avatar_colors": {
-            "A": "#F44336",  # Red
-            "B": "#E91E63",  # Pink
-            "C": "#9C27B0",  # Purple
-            "D": "#673AB7",  # Deep Purple
-            "E": "#3F51B5",  # Indigo
-            "F": "#2196F3",  # Blue
-            "G": "#03A9F4",  # Light Blue
-            "H": "#00BCD4",  # Cyan
-            "I": "#009688",  # Teal
-            "J": "#4CAF50",  # Green
-            "K": "#8BC34A",  # Light Green
-            "L": "#CDDC39",  # Lime
-            "M": "#FFEB3B",  # Yellow
-            "N": "#FFC107",  # Amber
-            "O": "#FF9800",  # Orange
-            "P": "#FF5722",  # Deep Orange
-            "Q": "#795548",  # Brown
-            "R": "#9E9E9E",  # Grey
-            "S": "#607D8B",  # Blue Grey
-            "T": "#FF1744",  # Bright Red
-            "U": "#D500F9",  # Bright Purple
-            "V": "#00E676",  # Bright Green
-            "W": "#00B0FF",  # Bright Cyan
-            "X": "#FFD600",  # Bright Yellow
-            "Y": "#FF6D00",  # Bright Orange
-            "Z": "#C51162"  # Bright Pink
-        },
-        **json.load(open(Path(__file__).with_name("data.default.json"))),
-        **json.load(open(Path(__file__).with_name("data.json")))
-    }
-
-
-config = get_live_config()
-
-
 def is_prod():
     return config.get("app_stage") == "prod"
-
-
-def get_config():
-    return config
 
 
 def get_static_files_dir() -> str:
@@ -559,27 +475,27 @@ def get_static_files_dir() -> str:
 
 
 def get_web_base_url() -> str:
-    return get_config().get("web_base_url") or ""
+    return config.get("web_base_url") or ""
 
 
 def get_api_base_url() -> str:
-    return get_config().get("api_base_url") or ""
+    return config.get("api_base_url") or ""
 
 
 def get_static_base_url() -> str:
-    return get_config().get("static_base_url") or ""
+    return config.get("static_base_url") or ""
 
 
 def get_aws_region():
-    return get_config().get("aws_region")
+    return config.get("aws_region")
 
 
 def get_dynamodb_endpoint():
-    return get_config().get("dynamodb_endpoint")
+    return config.get("dynamodb_endpoint")
 
 
 def get_dynamodb_table_name():
-    return get_config().get("dynamodb_table")
+    return config.get("dynamodb_table")
 
 
 def tag_subscription_key(tags: list[str]) -> str:
@@ -606,36 +522,36 @@ def get_user_tag_subscription_for_tags(user: User, tags: list[str]) -> TagSubscr
 
 def get_allowed_origins() -> list[str]:
     return [
-        get_config().get("allowed_origin"),
+        config.get("allowed_origin"),
     ]
 
 
 def get_cognito_domain():
-    return get_config().get("cognito_domain")
+    return config.get("cognito_domain")
 
 
 def get_cognito_client_id():
-    return get_config().get("cognito_client_id")
+    return config.get("cognito_client_id")
 
 
 def get_cognito_client_secret():
-    return get_config().get("cognito_client_secret")
+    return config.get("cognito_client_secret")
 
 
 def get_cognito_user_pool_id():
-    return get_config().get("cognito_user_pool_id")
+    return config.get("cognito_user_pool_id")
 
 
 def get_permission_hierarchy() -> dict[str, list[str]]:
-    return get_config().get("permission_hierarchy")
+    return config.get("permission_hierarchy")
 
 
 def get_auth_token_max_age() -> int:
-    return get_config().get("auth_token_max_age")
+    return config.get("auth_token_max_age")
 
 
 def get_auth_jwt_secret() -> str:
-    return get_config().get("auth_jwt_secret")
+    return config.get("auth_jwt_secret")
 
 
 class Lazy:
@@ -1059,7 +975,7 @@ def jinja2_order_classes(orders, inverse: bool = False) -> str:
 
 def get_jinja2_env():
     shared_templates_dir = os.path.join(os.path.dirname(__file__), "templates")
-    function_templates_dir = os.getenv("FUNCTION_TEMPLATES_DIR", "")
+    function_templates_dir = config.get("function_templates_dir", "") or ""
     templates_dirs = [path for path in function_templates_dir.split(os.pathsep) if path]
     templates_dirs.append(shared_templates_dir)
     jinja2_env = Environment(
@@ -1091,7 +1007,6 @@ def get_jinja2_env():
         "check_auth": check_authorization,
         "PromptStatus": PromptStatus,
         "PROMPT_MODELS": PROMPT_MODELS,
-        "PROMPT_CATEGORIES": PROMPT_CATEGORIES,
         "PROMPT_FORMATS": PROMPT_FORMATS,
         "PROMPT_TEMPLATE_FORMATS": PROMPT_TEMPLATE_FORMATS,
         "PromptImpressionAction": PromptImpressionAction,
@@ -1392,7 +1307,7 @@ def prompt_from_dynamodb(d_item: dict[str, Any]) -> Prompt:
         owner_id=owner_id,
         title=d_item["title"],
         description=d_item.get("description", ""),
-        category=d_item.get("category", PromptCategory.OTHER.value),
+        category=d_item.get("category", "other"),
         outputs=d_item.get("outputs", []),
         inputs=d_item.get("inputs", []),
         slug=d_item["prompt_slug"],
@@ -1573,31 +1488,21 @@ def add_decrease_tags_rating_transact(transacts: list, tags: list, now):
 
 def add_update_category_published_count_transact(transacts: list, category_slug: str,
                                                  delta: int, now: int) -> None:
-    category = PromptCategory(category_slug)
     default_count = 0 if delta > 0 else 1
     transacts.append({
         "Update": {
             "TableName": get_dynamodb_table_name(),
-            "Key": {"pk": f"CATEGORY#{category.value}", "sk": "META"},
+            "Key": {"pk": "CATEGORY", "sk": category_slug},
             "UpdateExpression": (
-                "SET #name = if_not_exists(#name, :name), "
-                "#description = if_not_exists(#description, :description), "
-                "#category_slug = if_not_exists(#category_slug, :category_slug), "
-                "#published_prompts_count = if_not_exists(#published_prompts_count, :default_count) + :delta, "
+                "SET #published_prompts_count = if_not_exists(#published_prompts_count, :default_count) + :delta, "
                 "#created_at = if_not_exists(#created_at, :now), #updated_at = :now"
             ),
             "ExpressionAttributeNames": {
-                "#name": "name",
-                "#description": "description",
-                "#category_slug": "category_slug",
                 "#published_prompts_count": "published_prompts_count",
                 "#created_at": "created_at",
                 "#updated_at": "updated_at",
             },
             "ExpressionAttributeValues": {
-                ":name": category.label,
-                ":description": category.description,
-                ":category_slug": category.value,
                 ":default_count": default_count,
                 ":delta": delta,
                 ":now": now,
@@ -2244,26 +2149,19 @@ def tag_from_dynamodb(d_item: dict[str, Any]) -> Tag:
     )
 
 
-def category_from_dynamodb(slug: str, d_item: dict[str, Any] | None = None) -> Category:
-    category = PromptCategory(slug)
-    d_item = d_item or {}
+def category_from_dynamodb(slug: str, d_item: dict[str, Any]) -> Category:
     return Category(
-        name=d_item.get("name") or category.label,
-        slug=category.value,
-        description=d_item.get("description") or category.description,
+        name=d_item["name"],
+        slug=d_item.get("category_slug", slug),
+        description=d_item.get("description", ""),
         published_prompts_count=d_item.get("published_prompts_count", 0),
         image_filename=d_item.get("image_filename"),
     )
 
 
 def find_category(slug: str) -> Category | None:
-    try:
-        category = PromptCategory(slug)
-    except ValueError:
-        return None
-    return category_from_dynamodb(
-        category.value, get_dynamodb_item(f"CATEGORY#{category.value}", "META")
-    )
+    item = get_dynamodb_item("CATEGORY", slug)
+    return category_from_dynamodb(slug, item) if item else None
 
 
 def get_category(slug: str) -> Category:
@@ -2274,14 +2172,11 @@ def get_category(slug: str) -> Category:
 
 
 def get_categories() -> list[Category]:
-    table = get_dynamodb_table()
-    keys = [{"pk": f"CATEGORY#{category.value}", "sk": "META"}
-            for category in PROMPT_CATEGORIES]
-    response = table.meta.client.batch_get_item(RequestItems={table.name: {"Keys": keys}})
-    items = response.get("Responses", {}).get(table.name, [])
-    items_by_slug = {item.get("category_slug"): item for item in items}
-    return [category_from_dynamodb(category.value, items_by_slug.get(category.value))
-            for category in PROMPT_CATEGORIES]
+    items = query_dynamodb_table(key_condition_expr=Key("pk").eq("CATEGORY")).get("Items", [])
+    return sorted(
+        (category_from_dynamodb(item["sk"], item) for item in items),
+        key=lambda category: category.name.lower(),
+    )
 
 
 def get_popular_tags(query_dto: TagQueryDTO = None) -> list[Tag]:

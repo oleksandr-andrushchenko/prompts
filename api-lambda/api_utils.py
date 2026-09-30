@@ -1,7 +1,6 @@
 from dataclasses import replace
 from html.parser import HTMLParser
 from http import HTTPStatus
-import os
 from urllib.parse import unquote, urlparse
 
 from basic_dtos import ContactMessageDTO, FileDTO, ImageFileDTO
@@ -10,9 +9,6 @@ from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
     UpdatePromptStatusDTO, UpdateTagDTO,
 )
-from prompt_contracts import extract_template_params
-from prompt_models import PromptCategory, get_prompt_model
-from query_dtos import PromptQueryDTO
 from shared_utils import *
 from shared_utils import (
     Category, Permission, User, add_update_category_published_count_transact,
@@ -21,6 +17,7 @@ from shared_utils import (
     get_web_base_url, logger,
 )
 from tag_subscription_dtos import TagSubscriptionDTO
+from validation import validate_category_slug
 from user_dtos import (
     UpdateUserDTO, UpdateUserImpressionDTO, UpdateUserStatusDTO,
     UpdateUserActivitySettingsDTO, UpdateUserInterestsSettingsDTO,
@@ -193,7 +190,7 @@ def _drop_cdn_cache(*urls) -> dict[str, Any]:
         }
 
     client = _get_cf_client()
-    distribution_id = get_cf_distribution_id()
+    distribution_id = config.get("cloudformation_districution_id")
     response = client.create_invalidation(
         DistributionId=distribution_id,
         InvalidationBatch={
@@ -465,24 +462,54 @@ def update_category(category: Category, dto: UpdateCategoryDTO, cur_user: User) 
 
     old_image = category.image_filename
     now = utc_now()
-    base = PromptCategory(category.slug)
-    existing = get_dynamodb_item(f"CATEGORY#{category.slug}", "META")
+    existing = get_dynamodb_item("CATEGORY", category.slug)
     changes = {
         "category_slug": category.slug,
-        "name": base.label,
+        "name": category.name,
         "description": category.description,
         "created_at": (existing or {}).get("created_at", now),
         **({"published_prompts_count": category.published_prompts_count} if not existing else {}),
         **changes,
     }
     transacts = []
-    add_dynamodb_update_transact(transacts, (f"CATEGORY#{category.slug}", "META"), changes)
+    add_dynamodb_update_transact(transacts, ("CATEGORY", category.slug), changes)
     dynamodb_transact_write(transacts)
     for key, value in changes.items():
         if hasattr(category, key):
             setattr(category, key, value)
     if old_image and image_action in {"delete", "replace"}:
         drop_public_file(old_image)
+
+
+def create_category(slug: str, name: str, description: str, cur_user: User) -> Category:
+    verify_authorization(cur_user, Permission.UPDATE_CATEGORY)
+    if cur_user.status == UserStatus.BANNED:
+        raise UserBannedError()
+
+    slug = validate_category_slug(slug)
+    name = name.strip()
+    description = description.strip()
+    if not 2 <= len(name) <= 80:
+        raise ValueError("name must contain between 2 and 80 characters")
+    if not 10 <= len(description) <= 500:
+        raise ValueError("description must contain between 10 and 500 characters")
+
+    existing = find_category(slug)
+    if existing:
+        return existing
+
+    now = utc_now()
+    values = {
+        "category_slug": slug,
+        "name": name,
+        "description": description,
+        "published_prompts_count": 0,
+        "created_at": now,
+    }
+    transacts = []
+    add_dynamodb_put_transact(transacts, ("CATEGORY", slug), values, new_pk_only=True)
+    dynamodb_transact_write(transacts)
+    return category_from_dynamodb(slug, {**values, "pk": "CATEGORY", "sk": slug})
 
 
 def save_public_file(file_dto: FileDTO, filename: str = None) -> str:
@@ -561,6 +588,7 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User, *,
     title = prompt_dto.title
     description = prompt_dto.description
     category = prompt_dto.category
+    get_category(category)
     outputs = prompt_dto.outputs
     template = prompt_dto.template
     validate_prompt_template_links(template["content"])
@@ -632,6 +660,9 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
     changes = update_prompt_dto.get_changes(prompt)
     if not changes and not refresh_params:
         return
+
+    if "category" in changes:
+        get_category(changes["category"])
 
     if "models" in changes:
         changes["models"] = list(changes["models"])
@@ -1236,15 +1267,15 @@ def get_email_files_dir() -> str:
 
 
 def get_static_s3_bucket() -> str:
-    return os.getenv("STATIC_S3_BUCKET")
+    return config.get("static_s3_bucket")
 
 
 def get_contact_topic_arn():
-    return get_config().get("contact_topic_arn")
+    return config.get("contact_topic_arn")
 
 
 def get_ses_from_email():
-    return get_config().get("ses_from_email")
+    return config.get("ses_from_email")
 
 
 def dispatch_prompt_published_event(prompt: Prompt) -> None:
@@ -1326,7 +1357,7 @@ def handle_prompt_published_event(event: PromptPublishedEvent) -> None:
                 f"Subscribed interests: {subscribed_tags_text}\n"
                 + "\n".join(f"{tag['name']}: {tag['url']}" for tag in tag_links)
                 + f"\n\nRead it here: {prompt_url}\n\n"
-                  f"Best regards,\n{get_config().get('site_name', 'The team')}\n"
+                  f"Best regards,\n{config.get('site_name', 'The team')}\n"
         )
         html_body = get_html_content("emails/prompt-published-notification.html", {
             "recipient_name": user.name or "there",

@@ -126,7 +126,7 @@
                 {% endif %}
 
                 <a class="badge rounded-pill text-bg-light text-decoration-none" title="Category"
-                   href="{{ prompts_url(category=prompt.category) }}">{{ prompt.category_label }}</a>
+                   href="{{ prompts_url(category=prompt.category) }}">{{ category.name }}</a>
 
                 <span class="badge rounded-pill text-bg-light">Template: {{ prompt.template.format|capitalize }}</span>
                 {% include "fragments/parameterized-label.html" %}
