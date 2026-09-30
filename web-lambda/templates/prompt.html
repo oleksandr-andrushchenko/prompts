@@ -115,7 +115,7 @@
 {% block content %}
     <div class="row g-4">
         <div class="{{ {"def": 12, "lg": 8} | col_classes }}">
-            <div class="mb-2">
+            <div class="mb-2 overflow-hidden">
                 {% if prompt.tags %}
                     <small class="text-secondary bi bi-tags"> Tags:</small>
                     {% for tag in prompt.tags %}
