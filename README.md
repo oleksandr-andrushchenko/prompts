@@ -138,6 +138,7 @@ custom domain, with no `/api` path prefix.
 - prompts file uploader upload -> remove -> upload bug
 - send newly created content's links to search-engines
 - replace `get_config().get("web_base_url") or ""` with `get_config("web_base_url")`, same for `config.get("web_base_url") or ""`
+- add categories and categories+ pages into sitemap
 
 ## Links
 

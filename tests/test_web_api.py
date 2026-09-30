@@ -1091,6 +1091,15 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     category_prompt_page = get(guest_client, "/prompts?category=code-dev")
     assert category_prompt_page.status_code == 200
     assert "Updated functional endpoint coverage prompt" in pq(category_prompt_page.text)("#prompts").text()
+    category_tag_prompt_page = get(
+        guest_client,
+        "/prompts?category=code-dev&tags=functional-tag",
+    )
+    assert category_tag_prompt_page.status_code == 200
+    category_tag_doc = pq(category_tag_prompt_page.text)
+    expected_title = "Latest Functional-tag LLM Prompts in Code & Dev"
+    assert expected_title in category_tag_doc("head title").text()
+    assert category_tag_doc("main h1").text() == expected_title
     category_item = dynamodb_table.get_item(
         Key={"pk": "CATEGORY", "sk": "code-dev"}
     )["Item"]
