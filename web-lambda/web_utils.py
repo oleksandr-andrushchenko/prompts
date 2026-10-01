@@ -356,21 +356,6 @@ def get_user_by_slug(username: str, cur_user: User = None) -> User:
     return user
 
 
-def get_legacy_user_redirect_url(req, slug: str) -> str | None:
-    user = find_user_by_username_follow_redirects(slug)
-    return get_user_url(req, user) if user else None
-
-
-def get_legacy_prompt_redirect_url(req, user_slug: str, prompt_slug: str) -> str | None:
-    user = find_user_by_username_follow_redirects(user_slug)
-    if not user:
-        return None
-    prompt = find_prompt_by_slug_follow_redirects(user.id, prompt_slug)
-    if not prompt or prompt.user_slug != user.username:
-        return None
-    return get_prompt_url(req, prompt)
-
-
 def _auth_cookie_domain() -> str | None:
     hostname = urlparse(get_web_base_url()).hostname
     if not hostname or hostname in {"localhost", "127.0.0.1"} or "." not in hostname:

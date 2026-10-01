@@ -72,7 +72,7 @@
 
     <div class="form-group mb-4 ">
         <small class="text-secondary bi bi-tags"> Tags:</small>
-        {% with url=url("tags", absolute=True), value=prompt.tags if prompt else [] %}
+        {% with url=url("api-tags", absolute=True), value=prompt.tags if prompt else [] %}
             {% include "fragments/tags-input.html" %}
         {% endwith %}
     </div>

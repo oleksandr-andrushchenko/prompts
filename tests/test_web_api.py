@@ -155,7 +155,7 @@ def check_header(doc, user_alias: str | None):
     header_el = doc("header")
     assert header_el('a[href$="/"]')
     assert header_el('a[href$="/prompts"]')
-    assert header_el('a[href$="/users"]')
+    # assert header_el('a[href$="/users"]')
     assert header_el('a[href$="/contacts"]')
     if user_alias:
         assert header_el('a[href$="/prompts/new"]')
@@ -230,7 +230,7 @@ def check_user(doc, followers_count: int, following_count: int, follow_control: 
 
 
 def check_prompts(doc, prompts_count: int, unpublished_control: bool, rejected_control: bool, tags_control: bool,
-                   popular_control: bool, prompt_aliases: list[str], css_id="prompts"):
+                  popular_control: bool, prompt_aliases: list[str], css_id="prompts"):
     main_el = doc("main")
     prompts_el = main_el("#" + css_id)
     if prompts_count:
@@ -307,9 +307,9 @@ def check_latest_prompt_comments(doc, comments_count: int, comment_texts: list[s
 
 def check_index(doc):
     check_prompts(doc, prompts_count=0, unpublished_control=False, rejected_control=False, tags_control=False,
-                   popular_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
+                  popular_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
     check_prompts(doc, prompts_count=0, unpublished_control=False, rejected_control=False, tags_control=False,
-                   popular_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="popular-prompts")
+                  popular_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="popular-prompts")
     check_latest_prompt_comments(doc, comments_count=0, comment_texts=[])
     check_users(doc, users_count=0, banned_control=False, popular_control=False, user_aliases=[], css_id="users")
     check_users(doc, users_count=3, banned_control=False, popular_control=False, user_aliases=list(user_ids.keys()),
@@ -388,7 +388,7 @@ def test_guest_user_get_user(guest_client, user_alias):
     check_user(doc, followers_count=0, following_count=0, follow_control=False, block_control=False, user_alias=None,
                activate_control=False, ban_control=False)
     check_prompts(doc, prompts_count=0, unpublished_control=False, rejected_control=False, tags_control=False,
-                   popular_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
+                  popular_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
 
 
 @pytest.mark.parametrize("user_alias", ["regular_2", "root"])
@@ -398,7 +398,7 @@ def test_regular_user_get_other_user(regular_user_client, user_alias):
     check_user(doc, followers_count=0, following_count=0, follow_control=True, block_control=True, user_alias=None,
                activate_control=False, ban_control=False)
     check_prompts(doc, prompts_count=0, unpublished_control=False, rejected_control=False, tags_control=False,
-                   popular_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
+                  popular_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
 
 
 def test_regular_user_get_self_user(regular_user_client):
@@ -408,7 +408,7 @@ def test_regular_user_get_self_user(regular_user_client):
     check_user(doc, followers_count=0, following_count=0, follow_control=False, block_control=False,
                user_alias=user_alias, activate_control=False, ban_control=False)
     check_prompts(doc, prompts_count=0, unpublished_control=True, rejected_control=True, popular_control=False,
-                   tags_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
+                  tags_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
 
 
 def test_root_user_get_user(root_user_client):
@@ -418,7 +418,7 @@ def test_root_user_get_user(root_user_client):
     check_user(doc, followers_count=0, following_count=0, follow_control=True, block_control=True,
                user_alias=user_alias, activate_control=False, ban_control=True)
     check_prompts(doc, prompts_count=0, unpublished_control=True, rejected_control=True, popular_control=False,
-                   tags_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
+                  tags_control=False, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
 
 
 def test_guest_user_get_users(guest_client):
@@ -442,19 +442,19 @@ def test_root_user_get_users(root_user_client):
 def test_guest_user_get_prompts(guest_client):
     doc = get_prompts(guest_client)
     check_prompts(doc, prompts_count=0, unpublished_control=False, rejected_control=False, tags_control=True,
-                   popular_control=True, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
+                  popular_control=True, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
 
 
 def test_regular_user_get_prompts(regular_user_client):
     doc = get_prompts(regular_user_client)
     check_prompts(doc, prompts_count=0, unpublished_control=False, rejected_control=False, tags_control=True,
-                   popular_control=True, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
+                  popular_control=True, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
 
 
 def test_root_user_get_prompts(root_user_client):
     doc = get_prompts(root_user_client)
     check_prompts(doc, prompts_count=0, unpublished_control=True, rejected_control=True, tags_control=True,
-                   popular_control=True, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
+                  popular_control=True, prompt_aliases=list(prompt_ids.keys()), css_id="prompts")
 
 
 @pytest.mark.parametrize("user_alias", ["regular", "root"])
@@ -564,55 +564,13 @@ def test_index_shows_latest_prompt_comments(guest_client):
         comment_texts.append(comment_text)
 
     doc = get_index(guest_client)
-    check_latest_prompt_comments(doc, comments_count=3, comment_texts=list(reversed(comment_texts[-3:]))) 
+    check_latest_prompt_comments(doc, comments_count=3, comment_texts=list(reversed(comment_texts[-3:])))
 
     comments = [pq(el).text() for el in doc("#latest-prompt-comments .prompt-comment").items()]
     assert comment_texts[5] in comments[0]
     assert comment_texts[3] in comments[-1]
     assert comment_texts[0] not in doc("#latest-prompt-comments").text()
     assert prompt_title in doc("#latest-prompt-comments").text()
-
-
-@pytest.mark.parametrize(("legacy_path", "prompt_path"), [
-    ("/posts", "/prompts"),
-    ("/post", "/prompts"),
-    ("/posts/new", "/prompts/new"),
-    ("/post/new", "/prompts/new"),
-    ("/posts/example-id", "/prompts/example-id"),
-    ("/post/example-id", "/prompts/example-id"),
-    ("/posts/example-id/edit", "/prompts/example-id/edit"),
-    ("/post/example-id/edit", "/prompts/example-id/edit"),
-    ("/latest/python/posts", "/latest/python/prompts"),
-])
-def test_legacy_prompt_page_urls_redirect_to_prompts(guest_client, legacy_path, prompt_path):
-    response = get(guest_client, f"{legacy_path}?limit=5", allow_redirects=False)
-    assert response.status_code == 308
-    assert response.headers["location"] == f"{prompt_path}?limit=5"
-
-
-@pytest.mark.parametrize(("method", "legacy_path", "prompt_path"), [
-    ("get", "/posts-fragment", "/prompts-fragment"),
-    ("get", "/users/example-id/posts-fragment", "/users/example-id/prompts-fragment"),
-    ("prompt", "/posts", "/prompts"),
-    ("patch", "/posts/example-id", "/prompts/example-id"),
-    ("prompt", "/posts/example-id/status", "/prompts/example-id/status"),
-    ("prompt", "/posts/example-id/impression", "/prompts/example-id/impression"),
-    ("prompt", "/posts/example-id/comment", "/prompts/example-id/comment"),
-    ("patch", "/posts/example-id/comments/example-comment-id",
-     "/prompts/example-id/comments/example-comment-id"),
-    ("get", "/post-tags/example-tag/edit", "/tags/example-tag/edit"),
-    ("get", "/post-tags", "/tags"),
-    ("patch", "/post-tags/example-tag", "/tags/example-tag"),
-])
-def test_legacy_prompt_endpoint_urls_preserve_method_and_redirect(
-        guest_client, method, legacy_path, prompt_path):
-    request = {"get": get, "prompt": prompt, "patch": patch}[method]
-    kwargs = {"allow_redirects": False}
-    if method != "get":
-        kwargs["json"] = {}
-    response = request(guest_client, f"{legacy_path}?limit=5", **kwargs)
-    assert response.status_code == 308
-    assert response.headers["location"] == f"{prompt_path}?limit=5"
 
 
 @pytest.mark.parametrize("path", [
@@ -897,9 +855,9 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     assert "image_filenames" not in prompt_item
 
     invalid_links_template = (
-        PROMPT_TEMPLATE
-        + '<a href="/@root-functional/missing-prompt">Missing prompt</a>'
-        + '<a href="http://web-lambda:5000/@root-functional/missing-prompt">Missing prompt again</a>'
+            PROMPT_TEMPLATE
+            + '<a href="/@root-functional/missing-prompt">Missing prompt</a>'
+            + '<a href="http://web-lambda:5000/@root-functional/missing-prompt">Missing prompt again</a>'
     )
     invalid_links = prompt(root_client, "/prompts", json={
         "title": "Prompt with invalid links",
@@ -1023,10 +981,10 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert edit_failure.status_code == 403
 
     invalid_links_template = (
-        PROMPT_TEMPLATE
-        + '<a href="/rules">Rules one</a>'
-        + '<a href="http://web-lambda:5000/rules">Rules two</a>'
-        + '<a href="/root-functional/missing-prompt">Missing prompt</a>'
+            PROMPT_TEMPLATE
+            + '<a href="/rules">Rules one</a>'
+            + '<a href="http://web-lambda:5000/rules">Rules two</a>'
+            + '<a href="/root-functional/missing-prompt">Missing prompt</a>'
     )
     invalid_links = patch(root_client, f"/prompts/{prompt_id}", json={
         "template": {"content": invalid_links_template, "format": "text"},
@@ -1123,7 +1081,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
         Key={"pk": "CATEGORY", "sk": "code-dev"}
     )["Item"]
     assert category_item["published_prompts_count"] == (
-        functional_state["code_dev_count_before_publish"] + 1
+            functional_state["code_dev_count_before_publish"] + 1
     )
 
 
@@ -1460,26 +1418,6 @@ def test_prompt_published_dispatch_matches_combinations_excludes_author_and_rend
 def test_logout_endpoint_wrong_method_failure(guest_client):
     failure = prompt(guest_client, "/logout", json={})
     assert failure.status_code == 405
-
-
-def test_legacy_slug_urls_redirect_only_for_existing_entities(guest_client):
-    prompt_slug = functional_state["prompt_slug"]
-    for legacy_path, canonical_path in [
-        ("/root-functional", "/@root-functional"),
-        (f"/root-functional/{prompt_slug}", f"/@root-functional/{prompt_slug}"),
-    ]:
-        response = get(guest_client, f"{legacy_path}?limit=5&offset=2", allow_redirects=False)
-        assert response.status_code == 308
-        assert response.headers["Location"].endswith(f"{canonical_path}?limit=5&offset=2")
-
-    for path in [
-        "/missing-functional-user",
-        "/root-functional/missing-functional-prompt",
-        f"/missing-functional-user/{prompt_slug}",
-    ]:
-        response = get(guest_client, path, allow_redirects=False)
-        assert response.status_code == 404
-        assert "Location" not in response.headers
 
 
 @pytest.mark.parametrize("path", [

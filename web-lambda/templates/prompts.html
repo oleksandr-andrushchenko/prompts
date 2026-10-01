@@ -141,7 +141,7 @@
 
         <div class="d-flex flex-wrap align-items-center gap-2">
             <small class="text-secondary bi bi-tags"> Filter by tags:</small>
-            {% with url=url("tags", absolute=True),
+            {% with url=url("api-tags", absolute=True),
                             value=prompt_query.tags,
                             tag_items=prompt_query_tag_items,
                             class_name="w-auto",
