@@ -134,7 +134,6 @@ custom domain, with no `/api` path prefix.
 - tags aliases: for example: cache=caching, cdn=content-delivery-network, etc.
 - prompt page: similar prompts section shows no the all prompts
 - prompt page: auto append/generate "More Prompts to Read" paragraph
-- file uploader with preview and TinyMCE image upload by URL
 - prompts file uploader upload -> remove -> upload bug
 - send newly created content's links to search-engines
 - replace `get_config().get("web_base_url") or ""` with `get_config("web_base_url")`, same for `config.get("web_base_url") or ""`

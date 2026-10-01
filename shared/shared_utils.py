@@ -1016,6 +1016,7 @@ def get_jinja2_env():
         "UserQueryType": UserQueryType,
         "UserStatus": UserStatus,
         "PromptQueryDTO": PromptQueryDTO,
+        "TagQueryDTO": TagQueryDTO,
         "UserQueryDTO": UserQueryDTO,
         "prompt_sentiment_rating": prompt_sentiment_rating,
         "html_to_text": html_to_text,
