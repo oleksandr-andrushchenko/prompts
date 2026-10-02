@@ -13,7 +13,9 @@ from shared_deps import (
     TagQueryDep,
     CategoryDep,
 )
-from shared_utils import find_category, get_categories, get_category, get_static_base_url, get_tags, get_web_base_url
+from shared_utils import (
+    find_category, get_categories, get_category, get_static_url, get_tags
+)
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import PlainTextResponse
 from web import (
@@ -89,15 +91,22 @@ app.add_middleware(TrailingSlashMiddleware)
 
 
 @app.get("/robots.txt", name="web-robots")
-async def robots_txt():
-    sitemap_base_url = get_static_base_url() or get_web_base_url()
+async def robots_txt(request: Request):
     return PlainTextResponse(
         "User-agent: *\n"
         "Content-Signal: search=yes, ai-input=yes, ai-train=no\n"
         "Allow: /\n"
         "Disallow: /login\n"
         "Disallow: /logout\n"
-        f"Sitemap: {sitemap_base_url.rstrip('/')}/sitemap.xml\n"
+        f"Sitemap: {get_static_url(request, 'sitemap.xml')}\n"
+    )
+
+
+@app.get("/sitemap.xml", name="web-sitemap")
+async def sitemap_xml(request: Request):
+    return RedirectResponse(
+        url=get_static_url(request, "sitemap.xml"),
+        status_code=301,
     )
 
 
