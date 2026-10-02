@@ -110,6 +110,14 @@ async def sitemap_xml(request: Request):
     )
 
 
+@app.get("/favicon.ico", name="web-favicon")
+async def favicon_ico(request: Request):
+    return RedirectResponse(
+        url=get_static_url(request, "favicon.ico"),
+        status_code=301,
+    )
+
+
 from api_route_metadata import API_URL_ROUTES
 from web_route_metadata import WEB_AUTH_URL_ROUTES, WEB_URL_ROUTES
 
