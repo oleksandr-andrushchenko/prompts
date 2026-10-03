@@ -3,7 +3,7 @@ from enum import StrEnum
 from urllib.parse import urlsplit
 
 from basic_dtos import BaseDTO, UNSET
-from prompt_models import get_prompt_model
+from prompt_models import sanitize_models
 from prompt_contracts import validate_template, validate_ports
 from query_dtos import PromptStatus
 from validation import validate_category_slug
@@ -41,15 +41,11 @@ def _validate_category(value):
 
 
 def _validate_models(values):
-    if isinstance(values, str):
-        values = [value.strip() for value in values.split(",") if value.strip()]
-    result = list(dict.fromkeys(values or []))
-    models = []
-    for value in result:
-        model = get_prompt_model(value)
-        if model is None:
-            raise ValueError(f"unsupported prompt model: {value}")
-        models.append(model.value)
+    models = sanitize_models(values)
+    if len(models) > 10:
+        raise ValueError("models must contain at most 10 items")
+    if any(not 2 <= len(value) <= 100 for value in models):
+        raise ValueError("each model must contain between 2 and 100 characters")
     return models
 
 

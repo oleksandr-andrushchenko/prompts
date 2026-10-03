@@ -56,19 +56,14 @@
 
     {% include "fragments/prompt-ports.html" %}
 
-    <fieldset class="form-group mb-4">
-        <legend class="col-form-label text-secondary">Recommended models (optional):</legend>
-        <div class="d-flex flex-wrap gap-3">
-            {% for model in PROMPT_MODELS %}
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="models" id="model-{{ loop.index }}"
-                           value="{{ model.value }}"
-                           {% if prompt and model in prompt.models %}checked{% endif %}>
-                    <label class="form-check-label" for="model-{{ loop.index }}">{{ model.value }}</label>
-                </div>
-            {% endfor %}
-        </div>
-    </fieldset>
+    <div class="form-group mb-4">
+        <small class="text-secondary bi bi-cpu"> Recommended models (optional):</small>
+        {% with input_id='models-input', field_name='models', placeholder='Models',
+                url=url('api-models', absolute=True), value=prompt.models if prompt else [],
+                max_items=10, min_length=2, max_length=100, normalize_kebab=false %}
+            {% include "fragments/tags-input.html" %}
+        {% endwith %}
+    </div>
 
     <div class="form-group mb-4 ">
         <small class="text-secondary bi bi-tags"> Tags:</small>
@@ -122,6 +117,9 @@
         }]])),
         tags: [
           {rule: "tags", minCnt: 0, maxCnt: 3, minLen: 2, maxLen: 40}
+        ],
+        models: [
+          {rule: "tags", minCnt: 0, maxCnt: 10, minLen: 2, maxLen: 100}
         ]
       },
       onSuccess: (res) => {

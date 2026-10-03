@@ -132,7 +132,7 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
   let originalBtnContent = submitBtn.innerHTML
 
   let validator = null
-  let hasTags = false
+  const tagFields = new Set()
 
   if (typeof window.JustValidate !== "undefined") {
     validator = new window.JustValidate(formSelector, {
@@ -158,11 +158,15 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
                 return false
               }
               if (!Array.isArray(values)) return true
-              const items = values.map(item => toKebabCase(item.value)).filter(Boolean)
+              const normalizeKebab = form.elements[field].dataset.hasOwnProperty("normalizeKebab")
+              const items = values
+                .map(item => typeof item === "string" ? item : item.value)
+                .map(item => normalizeKebab ? toKebabCase(item) : String(item || "").trim())
+                .filter(Boolean)
               return items.length >= minCnt && items.length <= maxCnt && items.every(t => t.length >= minLen && t.length <= maxLen)
-            }, errorMessage: `Tags must be ${minCnt}–${maxCnt} items, ${minLen}–${maxLen} chars each`
+            }, errorMessage: `Values must be ${minCnt}–${maxCnt} items, ${minLen}–${maxLen} chars each`
           }
-          hasTags = true
+          tagFields.add(field)
         }
       }
 
@@ -210,15 +214,18 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
       input.classList.remove("is-invalid") // reset invalid states
     })
 
-    if (hasTags) {
+    for (const field of tagFields) {
       let values = []
       try {
-        values = JSON.parse(form.tags.value || "[]")
+        values = JSON.parse(form.elements[field].value || "[]")
       } catch (error) {
         values = []
       }
-      data.tags = Array.isArray(values)
-        ? values.map(item => toKebabCase(typeof item === "string" ? item : item.value)).filter(Boolean)
+      const normalizeKebab = form.elements[field].dataset.hasOwnProperty("normalizeKebab")
+      data[field] = Array.isArray(values)
+        ? values.map(item => typeof item === "string" ? item : item.value)
+          .map(value => normalizeKebab ? toKebabCase(value) : String(value || "").trim())
+          .filter(Boolean)
         : []
     }
 
@@ -440,11 +447,14 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
 })();
 
 
-// Tags input
+// Tag-style catalog inputs
 (() => {
-  const input = document.getElementById("tags-input")
-  if (!input || typeof Tagify === "undefined") return
+  const inputs = document.querySelectorAll("[data-catalog-input]")
+  if (!inputs.length || typeof Tagify === "undefined") return
+  inputs.forEach(input => {
   const url = input.dataset.url
+  const fieldName = input.name
+  const normalizeKebab = input.dataset.hasOwnProperty("normalizeKebab")
   const injectHidden = input.dataset.hasOwnProperty("injectHidden")
   const autoSubmit = input.dataset.hasOwnProperty("autoSubmit")
   const form = input.closest("form")
@@ -458,14 +468,14 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
 
   const tagify = new Tagify(input, {
     whitelist: [],
-    maxTags: 3,
+    maxTags: Number(input.dataset.maxItems || 3),
     tagTextProp: "name",
     enforceWhitelist: false, // validate: tag => /^[0-9A-Za-z-.#]{2,20}$/.test(tag.value) || "Invalid tag",
     transformTag(tagData) {
       // Keep an existing tag's slug/name pair intact. Only normalize free-form
       // values; replacing tags from the `add` event makes Tagify briefly see the
       // selected value twice and reject/remove it as a duplicate.
-      if (!tagData.name || tagData.name === tagData.value) {
+      if (normalizeKebab && (!tagData.name || tagData.name === tagData.value)) {
         tagData.value = toKebabCase(tagData.value)
         tagData.name = tagData.value
       }
@@ -506,7 +516,7 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
       tagify.value.forEach(tag => {
         const hidden = document.createElement("input")
         hidden.type = "hidden"
-        hidden.name = "tags"  // use "tags" so backend maps correctly
+        hidden.name = fieldName
         hidden.value = tag.value
         hiddenContainer.appendChild(hidden)
       })
@@ -525,7 +535,7 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
 
   function onInput(e) {
     const value = e.detail.value
-    const prefix = toKebabCase(value)
+    const prefix = normalizeKebab ? toKebabCase(value) : value.trim()
     tagify.whitelist = []
     currentSuggestions = []
     tagify.dropdown.hide()
@@ -566,7 +576,7 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
               })
             }
           } else {
-            console.error(`Tags fetch failed with status ${res.status}`)
+            console.error(`Catalog fetch failed with status ${res.status}`)
           }
           tagify.loading(false)
           return null
@@ -613,6 +623,7 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
       tagify.updateValueByDOMTags()
     }, true)
   }
+  })
 })()
 
 // Enable bootstrap tooltip

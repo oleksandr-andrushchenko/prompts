@@ -1,4 +1,4 @@
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from html.parser import HTMLParser
 from http import HTTPStatus
 from urllib.parse import unquote, urlparse
@@ -9,12 +9,14 @@ from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
     UpdatePromptStatusDTO, UpdateTagDTO,
 )
+from prompt_models import normalize_model_slug
+from query_dtos import ModelQueryDTO
 from shared_utils import *
 from shared_utils import (
-    Category, Permission, User, add_update_category_published_count_transact,
+    Category, Key, Permission, User, add_update_category_published_count_transact,
     find_prompt, find_prompt_by_slug_follow_redirects,
     find_user_by_username_follow_redirects, get_categories, get_prompts, get_tags,
-    get_web_base_url, logger,
+    get_dynamodb_table_name, get_web_base_url, logger, query_dynamodb_table,
 )
 from tag_subscription_dtos import TagSubscriptionDTO
 from validation import validate_category_slug
@@ -24,6 +26,33 @@ from user_dtos import (
     UserImpressionAction,
 )
 from web import JSONResponse, RequestValidationError
+
+
+@dataclass(slots=True)
+class Model:
+    name: str
+    slug: str
+    published_prompts_count: int
+
+
+def get_models(query_dto: ModelQueryDTO | None = None) -> list[Model]:
+    if query_dto is None:
+        query_dto = ModelQueryDTO()
+    key_condition = Key("pk").eq("MODEL")
+    if query_dto.prefix:
+        prefix = normalize_model_slug(query_dto.prefix)
+        if not prefix:
+            return []
+        key_condition &= Key("sk").begins_with(prefix)
+    response = query_dynamodb_table(
+        key_condition_expr=key_condition,
+        limit=query_dto.limit,
+    )
+    return [Model(
+        name=item.get("name") or item["sk"],
+        slug=item["sk"],
+        published_prompts_count=item.get("published_prompts_count", 0),
+    ) for item in response.get("Items", [])]
 
 
 class PromptHrefExtractor(HTMLParser):
@@ -528,6 +557,36 @@ def drop_public_file(filename: str) -> None:
     get_s3_client().delete_object(Bucket=get_static_s3_bucket(), Key=filename)
 
 
+def add_model_registry_updates_transact(
+        transacts: list, models: list[str], now: int, published_delta: int = 0) -> None:
+    """Ensure model records exist and atomically adjust their published usage."""
+    for model in dict.fromkeys(models):
+        transacts.append({
+            "Update": {
+                "TableName": get_dynamodb_table_name(),
+                "Key": {"pk": "MODEL", "sk": model},
+                "UpdateExpression": (
+                    "SET #name = if_not_exists(#name, :name), "
+                    "#count = if_not_exists(#count, :zero) + :delta, "
+                    "#created_at = if_not_exists(#created_at, :now), "
+                    "#updated_at = :now"
+                ),
+                "ExpressionAttributeNames": {
+                    "#name": "name",
+                    "#count": "published_prompts_count",
+                    "#created_at": "created_at",
+                    "#updated_at": "updated_at",
+                },
+                "ExpressionAttributeValues": {
+                    ":name": model,
+                    ":zero": 0,
+                    ":delta": published_delta,
+                    ":now": now,
+                },
+            },
+        })
+
+
 def create_prompt(prompt_dto: PromptDTO, cur_user: User, *,
                   source: dict | None = None, slug_scope_prechecked: bool = False) -> Prompt:
     verify_authorization(cur_user, Permission.CREATE_PROMPT)
@@ -579,6 +638,7 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User, *,
     if cur_user.username:
         prompt_item["user_slug"] = cur_user.username
     add_dynamodb_put_transact(transacts, (f"PROMPT#{prompt_id}", "META"), prompt_item, new_pk_only=True)
+    add_model_registry_updates_transact(transacts, prompt_dto.models, now)
 
     add_user_activity_transact(transacts, cur_user, "prompt.created", "prompt", prompt_id, title,
                                f"/prompts/{prompt_id}", cur_user.id, now)
@@ -672,6 +732,15 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
         if published_already and tags_changed:
             changes["status"] = PromptStatus.UNPUBLISHED
 
+    old_models = list(prompt.models)
+    new_models = changes.get("models", old_models)
+    models_changed = sorted(new_models) != sorted(old_models)
+    if published_already and models_changed:
+        changes["status"] = PromptStatus.UNPUBLISHED
+    if models_changed:
+        added_models = [model for model in new_models if model not in old_models]
+        add_model_registry_updates_transact(transacts, added_models, now)
+
     if published_already and changes.get("status") == PromptStatus.UNPUBLISHED:
         add_decrease_tags_rating_transact(transacts, old_tags, now)
         add_delete_tag_combos_transact(transacts, prompt)
@@ -701,6 +770,10 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
 
     crossed_published_boundary = (old_status == PromptStatus.PUBLISHED) != (status == PromptStatus.PUBLISHED)
     if crossed_published_boundary:
+        add_model_registry_updates_transact(
+            transacts, old_models if old_status == PromptStatus.PUBLISHED else new_models,
+            now, -1 if old_status == PromptStatus.PUBLISHED else 1,
+        )
         add_update_category_published_count_transact(
             transacts, prompt.category, 1 if status == PromptStatus.PUBLISHED else -1, now
         )
@@ -724,10 +797,7 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
         if k != "models" and hasattr(prompt, k):
             setattr(prompt, k, v)
     if "models" in changes:
-        prompt.models = [
-            model for model_slug in changes["models"]
-            if (model := get_prompt_model(model_slug))
-        ]
+        prompt.models = list(changes["models"])
 
 
 def create_prompt_comment(prompt: Prompt, prompt_comment_dto: PromptCommentDTO, cur_user: User,
@@ -1004,10 +1074,12 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
             changes["user_slug"] = prompt_owner.username
 
         add_increase_tags_rating_transact(transacts, prompt.tags, now)
+        add_model_registry_updates_transact(transacts, prompt.models, now, 1)
         add_put_tag_combos_transact(transacts, prompt)
         add_update_category_published_count_transact(transacts, prompt.category, 1, now)
     elif crossed_published_boundary:
         add_decrease_tags_rating_transact(transacts, prompt.tags, now)
+        add_model_registry_updates_transact(transacts, prompt.models, now, -1)
         add_delete_tag_combos_transact(transacts, prompt)
         add_update_category_published_count_transact(transacts, prompt.category, -1, now)
 

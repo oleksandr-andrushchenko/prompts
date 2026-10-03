@@ -116,7 +116,7 @@ def _is_api_request(method: str, url: str) -> bool:
             path.endswith(suffix) for suffix in ("/comments-fragment", "/prompts-fragment")):
         return True
     if method == "GET":
-        return path in {"/prompts/hrefs", "/tag-subscriptions", "/tags"}
+        return path in {"/prompts/hrefs", "/tag-subscriptions", "/tags", "/models"}
     if method == "POST":
         return path in {
             "/public-file", "/prompts", "/contacts/message",

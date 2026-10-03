@@ -83,6 +83,19 @@ class TagQueryDTO(BaseQueryDTO):
         return BaseQueryDTO.has_params(self) or self.type != self.DEFAULT_TYPE or self.prefix is not None
 
 
+@dataclass(slots=True)
+class ModelQueryDTO(BaseQueryDTO):
+    prefix: str | None = None
+
+    def __post_init__(self):
+        BaseQueryDTO.__post_init__(self)
+        if self.prefix is not None and not 1 <= len(self.prefix) <= 100:
+            raise ValueError("prefix must contain between 1 and 100 characters")
+
+    def has_params(self):
+        return BaseQueryDTO.has_params(self) or self.prefix is not None
+
+
 class PromptQueryType(StrEnum):
     LATEST = "latest"
     POPULAR = "popular"

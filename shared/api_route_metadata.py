@@ -19,6 +19,7 @@ API_URL_ROUTES = {
     "update-category": "/categories/{slug}",
     "get-categories": "/categories",
     "api-tags": "/tags",
+    "api-models": "/models",
     "tags-fragment": "/tags-fragment",
     "users-fragment": "/users-fragment",
     "update-user-status": "/users/{user_id}/status",

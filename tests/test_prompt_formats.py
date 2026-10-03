@@ -9,7 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(os.environ.get('PROJECT_ROOT', Path(__file__).resolve().parents[1])) / 'shared'))
 from prompt_contracts import extract_template_params, normalize_template_params
 from prompt_dtos import PromptDTO, UpdatePromptDTO
-from prompt_models import PROMPT_MODELS, PromptModel, get_prompt_model
+from prompt_models import PROMPT_MODELS, PromptModel, get_prompt_model, normalize_model_slug
 from shared_utils import prompt_from_dynamodb
 
 
@@ -41,7 +41,8 @@ def test_model_values_are_canonicalized():
     assert issubclass(PromptModel, StrEnum)
     assert PromptModel.GPT_4O.value == 'openai-gpt-4o'
     assert dto().models == ['openai-gpt-4o']
-    assert dto(models=['GPT-4o (2024-05-13)']).models == ['openai-gpt-*']
+    assert dto(models=['GPT-4o (2024-05-13)']).models == ['openai-gpt-4o-2024-05-13']
+    assert dto(models=['Acme Dream 2.1']).models == ['acme-dream-2-1']
 
 
 def test_prompt_can_leave_models_unspecified():
@@ -104,6 +105,13 @@ def test_prompt_models_cover_prompts_chat_models_and_unknown_versions():
     assert len(PROMPT_MODELS) == len(set(PROMPT_MODELS))
 
 
+def test_dynamic_model_normalization_preserves_unknown_versions():
+    assert normalize_model_slug('GPT-5.7') == 'openai-gpt-5-7'
+    assert normalize_model_slug('Claude 5 Opus') == 'anthropic-claude-5-opus'
+    assert normalize_model_slug('Midjourney v8') == 'midjourney-v8'
+    assert normalize_model_slug('Acme Dream 2.1') == 'acme-dream-2-1'
+
+
 def test_prompt_model_aliases_are_stored_as_canonical_slugs():
     assert dto(models=['gpt-5-*', 'claude-4-5-opus', 'sora 2']).models == [
         'openai-gpt-5-*',
@@ -162,11 +170,12 @@ def test_old_prompt_records_derive_params_from_template():
     item = dict(id='parameterized', user_id='owner', title='Parameterized', description='Example',
                 category='other', prompt_slug='parameterized', status='published', rating_sk=0,
                 created_at=1, template={'content': 'Use ${Language:Turkish}.', 'format': 'text'},
-                inputs=[], outputs=[])
+                inputs=[], outputs=[], models=['acme-dream-2-1'])
 
     value = prompt_from_dynamodb(item)
     assert value.template['content'] == 'Use ${language:Turkish}.'
     assert value.params == [{'name': 'language', 'default': 'Turkish'}]
+    assert value.models == ['acme-dream-2-1']
 
 
 def test_result_files_are_not_artificially_count_limited():

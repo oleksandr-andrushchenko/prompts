@@ -11,7 +11,7 @@ from tag_subscription_dtos import TagSubscriptionDTO
 from basic_dtos import ImageFileDTO
 from category_dtos import UpdateCategoryDTO
 from cdn_cache_dtos import DropCDNCacheDTO
-from query_dtos import PromptCommentQueryDTO
+from query_dtos import ModelQueryDTO, PromptCommentQueryDTO
 from user_dtos import UpdateUserDTO, UpdateUserActivitySettingsDTO, UpdateUserImpressionDTO, UpdateUserInterestsSettingsDTO, UpdateUserStatusDTO
 from shared_utils import PromptComment, PromptCommentNotFoundError, get_prompt_comment
 from web import Body, Depends, HTTPException, Request, RequestValidationError
@@ -114,3 +114,4 @@ DropCDNCacheDTODep = Annotated[DropCDNCacheDTO, Depends(get_drop_cdn_cache_dto)]
 ImageFileDTODep = Annotated[ImageFileDTO, Depends(get_image_file)]
 UpdateUserImpressionDTODep = Annotated[UpdateUserImpressionDTO, Depends(get_update_user_impression_dto)]
 PromptCommentQueryDep = Annotated[PromptCommentQueryDTO, Depends()]
+ModelQueryDep = Annotated[ModelQueryDTO, Depends()]

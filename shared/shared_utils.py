@@ -27,7 +27,7 @@ from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescap
 from notifications import configure_telegram_logging
 from prompt_contracts import extract_template_params, normalize_template_params
 from prompt_dtos import (PromptCommentImpressionAction, PromptImpressionAction)
-from prompt_models import PROMPT_MODELS, PROMPT_FORMATS, PROMPT_TEMPLATE_FORMATS, PromptModel, get_prompt_model
+from prompt_models import PROMPT_FORMATS, PROMPT_TEMPLATE_FORMATS
 from query_dtos import (BaseQueryDTO, PromptCommentQueryDTO, PromptQueryDTO, PromptQueryType, PromptStatus,
                         TagQueryDTO, TagQueryType, UserQueryDTO, UserQueryType, UserStatus)
 from tag_subscription_dtos import TagSubscription
@@ -258,7 +258,7 @@ class Prompt:
         return None
 
     template: dict
-    models: list[PromptModel]
+    models: list[str]
     tags: list[str]
     status: PromptStatus
     comment: str | None
@@ -1006,7 +1006,6 @@ def get_jinja2_env():
         "Permission": Permission,
         "check_auth": check_authorization,
         "PromptStatus": PromptStatus,
-        "PROMPT_MODELS": PROMPT_MODELS,
         "PROMPT_FORMATS": PROMPT_FORMATS,
         "PROMPT_TEMPLATE_FORMATS": PROMPT_TEMPLATE_FORMATS,
         "PromptImpressionAction": PromptImpressionAction,
@@ -1299,10 +1298,7 @@ def prompt_from_dynamodb(d_item: dict[str, Any]) -> Prompt:
     params = d_item.get("params")
     if params != extracted_params:
         params = extracted_params
-    models = [
-        model for model_slug in d_item.get("models", [])
-        if (model := get_prompt_model(model_slug))
-    ]
+    models = list(dict.fromkeys(d_item.get("models", [])))
     return Prompt(
         id=d_item["id"],
         owner_id=owner_id,

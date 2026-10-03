@@ -1,3 +1,5 @@
+import re
+import unicodedata
 from enum import StrEnum
 
 
@@ -284,6 +286,87 @@ PROMPT_MODEL_PREFIX_ALIASES = (
     ("udio-", PromptModel.UDIO_ANY),
     ("udio ", PromptModel.UDIO_ANY),
 )
+
+
+PROMPT_MODEL_PROVIDER_PREFIXES = (
+    ("gpt-", "openai-"),
+    ("chatgpt-", "openai-"),
+    ("o1-", "openai-"),
+    ("o3-", "openai-"),
+    ("o4-", "openai-"),
+    ("dall-e-", "openai-"),
+    ("sora-", "openai-"),
+    ("claude-", "anthropic-"),
+    ("gemini-", "google-"),
+    ("nano-banana-", "google-"),
+    ("imagen-", "google-"),
+    ("veo-", "google-"),
+    ("grok-", "xai-"),
+    ("llama-", "meta-"),
+    ("qwen-", "alibaba-"),
+    ("wan-", "alibaba-"),
+    ("command-", "cohere-"),
+    ("sonar-", "perplexity-"),
+    ("flux-", "black-forest-labs-"),
+    ("stable-diffusion-", "stability-ai-"),
+    ("firefly-", "adobe-"),
+    ("seedance-", "bytedance-"),
+    ("hailuo-", "minimax-"),
+)
+
+PROMPT_MODEL_CANONICAL_PREFIXES = tuple({
+    value.value.split("-", 1)[0] + "-"
+    for value in PROMPT_MODELS
+    if "-" in value.value
+}) + (
+    "openai-", "anthropic-", "google-", "xai-", "meta-", "alibaba-",
+    "cohere-", "perplexity-", "black-forest-labs-", "stability-ai-",
+    "adobe-", "bytedance-", "minimax-",
+)
+
+
+def _model_kebab_case(value: str) -> str:
+    value = unicodedata.normalize("NFKC", value).casefold().strip()
+    value = re.sub(r"[^\w*]+", "-", value, flags=re.UNICODE)
+    return re.sub(r"-+", "-", value).strip("-")
+
+
+def normalize_model_slug(value: str | None) -> str | None:
+    """Return a stable model slug without requiring a hard-coded catalog entry."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+
+    raw = value.strip().casefold()
+    known = PROMPT_MODEL_ALIASES.get(raw)
+    if known is not None:
+        return known.value
+
+    slug = _model_kebab_case(value)
+    if not slug:
+        return None
+
+    # Already provider-qualified values must round-trip unchanged.
+    if slug.startswith(PROMPT_MODEL_CANONICAL_PREFIXES):
+        return slug
+
+    for prefix, provider in PROMPT_MODEL_PROVIDER_PREFIXES:
+        bare_prefix = prefix.rstrip("-")
+        if slug == bare_prefix or slug.startswith(prefix):
+            return provider + slug
+    return slug
+
+
+def sanitize_models(values) -> list[str]:
+    if isinstance(values, str):
+        values = [value.strip() for value in values.split(",") if value.strip()]
+    result = []
+    for value in values or []:
+        slug = normalize_model_slug(value)
+        if not slug:
+            raise ValueError(f"invalid prompt model: {value}")
+        if slug not in result:
+            result.append(slug)
+    return result
 
 
 def get_prompt_model(value: str | None) -> PromptModel | None:

@@ -50,6 +50,7 @@ from api_utils import (
     create_tag_subscription,
     delete_tag_subscription,
     update_category,
+    get_models,
 )
 from deps import (
     ImageFileDTODep,
@@ -68,6 +69,7 @@ from deps import (
     UpdateCategoryDTODep,
     TagSubscriptionDTODep,
     DropCDNCacheDTODep,
+    ModelQueryDep,
 )
 from notifications import get_access_log
 from shared_deps import (
@@ -344,6 +346,11 @@ async def _update_tag(update_tag_dto: UpdateTagDTODep, tag: TagDep,
 @route("get", "api-tags", response_class=JSONResponse)
 async def _get_tags(query_dto: TagQueryDep) -> list[Tag]:
     return get_tags(query_dto)
+
+
+@route("get", "api-models", response_class=JSONResponse)
+async def _get_models(query_dto: ModelQueryDep):
+    return get_models(query_dto)
 
 
 @route("get", "get-categories", response_class=JSONResponse)
