@@ -567,3 +567,9 @@ async def utils(cur_user: CurUserDep) -> str:
     return get_html_content("utils.html", {
         "cur_user": cur_user,
     })
+
+
+# Keep this catch-all route last so named top-level pages take precedence.
+@route("get", "legacy-user-by-slug")
+async def legacy_user_page_by_slug(user: UserBySlugDep, request: Request) -> RedirectResponse:
+    return RedirectResponse(url=get_user_url(request, user), status_code=308)

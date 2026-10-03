@@ -31,4 +31,5 @@ WEB_URL_ROUTES = WEB_AUTH_URL_ROUTES | {
     "utils": "/utils",
     "user-by-slug": "/@{slug}",
     "prompt-by-slugs": "/@{user_slug}/{prompt_slug}",
+    "legacy-user-by-slug": "/{slug}",
 }

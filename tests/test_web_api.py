@@ -736,8 +736,13 @@ def test_user_edit_update_and_fragment_endpoints_success_and_failure(root_user_c
 
     slug_success = get(guest_client, "/@root-functional")
     assert slug_success.status_code == 200
+    legacy_slug = get(guest_client, "/root-functional", allow_redirects=False)
+    assert legacy_slug.status_code == 308
+    assert legacy_slug.headers["location"] == "/@root-functional"
     slug_failure = get(guest_client, "/@missing-functional-user")
     assert slug_failure.status_code == 404
+    legacy_slug_failure = get(guest_client, "/missing-functional-user")
+    assert legacy_slug_failure.status_code == 404
 
 
 def test_user_settings_endpoints_success_and_failure(guest_client):
