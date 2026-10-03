@@ -9,7 +9,7 @@ from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
     UpdatePromptStatusDTO, UpdateTagDTO,
 )
-from prompt_models import normalize_model_slug
+from prompt_models import PROMPT_MODELS, normalize_model_slug
 from query_dtos import ModelQueryDTO
 from shared_utils import *
 from shared_utils import (
@@ -32,7 +32,6 @@ from web import JSONResponse, RequestValidationError
 class Model:
     name: str
     slug: str
-    published_prompts_count: int
 
 
 def get_models(query_dto: ModelQueryDTO | None = None) -> list[Model]:
@@ -48,11 +47,17 @@ def get_models(query_dto: ModelQueryDTO | None = None) -> list[Model]:
         key_condition_expr=key_condition,
         limit=query_dto.limit,
     )
-    return [Model(
-        name=item.get("name") or item["sk"],
-        slug=item["sk"],
-        published_prompts_count=item.get("published_prompts_count", 0),
-    ) for item in response.get("Items", [])]
+    models = {
+        str(model): Model(name=str(model), slug=str(model))
+        for model in PROMPT_MODELS
+        if not query_dto.prefix or str(model).startswith(normalize_model_slug(query_dto.prefix))
+    }
+    for item in response.get("Items", []):
+        models[item["sk"]] = Model(
+            name=item.get("name") or item["sk"],
+            slug=item["sk"],
+        )
+    return sorted(models.values(), key=lambda model: model.slug)[:query_dto.limit]
 
 
 class PromptHrefExtractor(HTMLParser):
@@ -558,8 +563,8 @@ def drop_public_file(filename: str) -> None:
 
 
 def add_model_registry_updates_transact(
-        transacts: list, models: list[str], now: int, published_delta: int = 0) -> None:
-    """Ensure model records exist and atomically adjust their published usage."""
+        transacts: list, models: list[str], now: int) -> None:
+    """Ensure dynamically encountered model records exist."""
     for model in dict.fromkeys(models):
         transacts.append({
             "Update": {
@@ -567,20 +572,16 @@ def add_model_registry_updates_transact(
                 "Key": {"pk": "MODEL", "sk": model},
                 "UpdateExpression": (
                     "SET #name = if_not_exists(#name, :name), "
-                    "#count = if_not_exists(#count, :zero) + :delta, "
                     "#created_at = if_not_exists(#created_at, :now), "
                     "#updated_at = :now"
                 ),
                 "ExpressionAttributeNames": {
                     "#name": "name",
-                    "#count": "published_prompts_count",
                     "#created_at": "created_at",
                     "#updated_at": "updated_at",
                 },
                 "ExpressionAttributeValues": {
                     ":name": model,
-                    ":zero": 0,
-                    ":delta": published_delta,
                     ":now": now,
                 },
             },
@@ -770,10 +771,6 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
 
     crossed_published_boundary = (old_status == PromptStatus.PUBLISHED) != (status == PromptStatus.PUBLISHED)
     if crossed_published_boundary:
-        add_model_registry_updates_transact(
-            transacts, old_models if old_status == PromptStatus.PUBLISHED else new_models,
-            now, -1 if old_status == PromptStatus.PUBLISHED else 1,
-        )
         add_update_category_published_count_transact(
             transacts, prompt.category, 1 if status == PromptStatus.PUBLISHED else -1, now
         )
@@ -1074,12 +1071,10 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
             changes["user_slug"] = prompt_owner.username
 
         add_increase_tags_rating_transact(transacts, prompt.tags, now)
-        add_model_registry_updates_transact(transacts, prompt.models, now, 1)
         add_put_tag_combos_transact(transacts, prompt)
         add_update_category_published_count_transact(transacts, prompt.category, 1, now)
     elif crossed_published_boundary:
         add_decrease_tags_rating_transact(transacts, prompt.tags, now)
-        add_model_registry_updates_transact(transacts, prompt.models, now, -1)
         add_delete_tag_combos_transact(transacts, prompt)
         add_update_category_published_count_transact(transacts, prompt.category, -1, now)
 
