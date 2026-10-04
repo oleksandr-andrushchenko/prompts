@@ -373,6 +373,13 @@ async def tags_fragment(query_dto: TagQueryDep) -> str:
     })
 
 
+@route("get", "models-fragment", response_class=HTMLResponse)
+async def models_fragment(query_dto: ModelQueryDep) -> str:
+    return get_html_content("fragments/models.html", {
+        "models": get_models(query_dto),
+    })
+
+
 @route("get", "users-fragment", response_class=HTMLResponse)
 async def users_fragment(query_dto: UserQueryDep, cur_user: OptCurUserDep) -> str:
     return get_html_content("fragments/users.html", {

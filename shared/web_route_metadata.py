@@ -13,6 +13,7 @@ WEB_URL_ROUTES = WEB_AUTH_URL_ROUTES | {
     "new-prompt": "/prompts/new",
     "prompts": "/prompts",
     "tags": "/tags",
+    "models": "/models",
     "categories": "/categories",
     "edit-category": "/categories/{slug}/edit",
     "prompt": "/prompts/{prompt_id}",

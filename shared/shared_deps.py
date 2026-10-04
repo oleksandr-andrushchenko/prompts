@@ -5,6 +5,7 @@ from shared_utils import (
     PromptQueryDTO,
     Prompt,
     TagQueryDTO,
+    ModelQueryDTO,
     UserQueryDTO,
     InvalidTokenError,
     PromptNotFoundError,
@@ -92,5 +93,6 @@ UserQueryDep = Annotated[UserQueryDTO, Depends()]
 PromptDep = Annotated[Prompt, Depends(get_prompt_by_id)]
 PromptQueryDep = Annotated[PromptQueryDTO, Depends(get_prompt_query)]
 TagQueryDep = Annotated[TagQueryDTO, Depends()]
+ModelQueryDep = Annotated[ModelQueryDTO, Depends()]
 TagDep = Annotated[Tag, Depends(get_tag_by_slug)]
 CategoryDep = Annotated[Category, Depends(get_category_by_slug)]

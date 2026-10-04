@@ -1,4 +1,4 @@
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from html.parser import HTMLParser
 from http import HTTPStatus
 from urllib.parse import unquote, urlparse
@@ -9,13 +9,11 @@ from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
     UpdatePromptStatusDTO, UpdateTagDTO,
 )
-from prompt_models import PROMPT_MODELS, normalize_model_slug
-from query_dtos import ModelQueryDTO
 from shared_utils import *
 from shared_utils import (
     Category, Key, Permission, User, add_update_category_published_count_transact,
     find_prompt, find_prompt_by_slug_follow_redirects,
-    find_user_by_username_follow_redirects, get_categories, get_prompts, get_tags,
+    find_user_by_username_follow_redirects, get_categories, get_models, get_prompts, get_tags,
     get_dynamodb_table_name, get_web_base_url, logger, query_dynamodb_table,
 )
 from tag_subscription_dtos import TagSubscriptionDTO
@@ -26,38 +24,6 @@ from user_dtos import (
     UserImpressionAction,
 )
 from web import JSONResponse, RequestValidationError
-
-
-@dataclass(slots=True)
-class Model:
-    name: str
-    slug: str
-
-
-def get_models(query_dto: ModelQueryDTO | None = None) -> list[Model]:
-    if query_dto is None:
-        query_dto = ModelQueryDTO()
-    key_condition = Key("pk").eq("MODEL")
-    if query_dto.prefix:
-        prefix = normalize_model_slug(query_dto.prefix)
-        if not prefix:
-            return []
-        key_condition &= Key("sk").begins_with(prefix)
-    response = query_dynamodb_table(
-        key_condition_expr=key_condition,
-        limit=query_dto.limit,
-    )
-    models = {
-        str(model): Model(name=str(model), slug=str(model))
-        for model in PROMPT_MODELS
-        if not query_dto.prefix or str(model).startswith(normalize_model_slug(query_dto.prefix))
-    }
-    for item in response.get("Items", []):
-        models[item["sk"]] = Model(
-            name=item.get("name") or item["sk"],
-            slug=item["sk"],
-        )
-    return sorted(models.values(), key=lambda model: model.slug)[:query_dto.limit]
 
 
 class PromptHrefExtractor(HTMLParser):
@@ -278,6 +244,7 @@ def generate_sitemap(user: User, req) -> tuple[int, str]:
     urls.extend([
         (url("index"), today),
         (url("tags"), today),
+        (url("models"), today),
         (url("categories"), today),
         (url("contacts"), today),
         (url("rules"), today),

@@ -11,10 +11,11 @@ from shared_deps import (
     UserDep,
     TagDep,
     TagQueryDep,
+    ModelQueryDep,
     CategoryDep,
 )
 from shared_utils import (
-    find_category, get_categories, get_category, get_static_url, get_tags
+    find_category, get_categories, get_category, get_models, get_static_url, get_tags
 )
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import PlainTextResponse
@@ -351,6 +352,15 @@ async def tags_page(query_dto: TagQueryDep, cur_user: OptCurUserDep) -> str:
         "cur_user": cur_user,
         "tags": tags,
         "tags_query": query_dto,
+    })
+
+
+@route("get", "models", response_class=HTMLResponse)
+async def models_page(query_dto: ModelQueryDep, cur_user: OptCurUserDep) -> str:
+    return get_html_content("models.html", {
+        "cur_user": cur_user,
+        "models": get_models(query_dto),
+        "models_query": query_dto,
     })
 
 

@@ -27,9 +27,9 @@ from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescap
 from notifications import configure_telegram_logging
 from prompt_contracts import extract_template_params, normalize_template_params
 from prompt_dtos import (PromptCommentImpressionAction, PromptImpressionAction)
-from prompt_models import PROMPT_FORMATS, PROMPT_TEMPLATE_FORMATS
-from query_dtos import (BaseQueryDTO, PromptCommentQueryDTO, PromptQueryDTO, PromptQueryType, PromptStatus,
-                        TagQueryDTO, TagQueryType, UserQueryDTO, UserQueryType, UserStatus)
+from prompt_models import PROMPT_FORMATS, PROMPT_MODELS, PROMPT_TEMPLATE_FORMATS, normalize_model_slug
+from query_dtos import (BaseQueryDTO, ModelQueryDTO, PromptCommentQueryDTO, PromptQueryDTO, PromptQueryType,
+                        PromptStatus, TagQueryDTO, TagQueryType, UserQueryDTO, UserQueryType, UserStatus)
 from tag_subscription_dtos import TagSubscription
 from user_dtos import UserImpressionAction
 
@@ -81,6 +81,13 @@ class User:
     show_activity_calendar: bool
     show_recent_activity: bool
     show_interests: bool
+
+
+@dataclass(slots=True)
+class Model:
+    name: str
+    slug: str
+    offset: str | None = None
 
 
 @dataclass(slots=True)
@@ -2174,6 +2181,45 @@ def get_categories() -> list[Category]:
         (category_from_dynamodb(item["sk"], item) for item in items),
         key=lambda category: category.name.lower(),
     )
+
+
+def get_models(query_dto: ModelQueryDTO | None = None) -> list[Model]:
+    if query_dto is None:
+        query_dto = ModelQueryDTO()
+
+    prefix = normalize_model_slug(query_dto.prefix) if query_dto.prefix else None
+    if query_dto.prefix and not prefix:
+        return []
+
+    cursor = None
+    if query_dto.offset:
+        cursor = decode_offset(query_dto.offset).get("slug")
+
+    key_condition = Key("pk").eq("MODEL")
+    if prefix:
+        key_condition &= Key("sk").begins_with(prefix)
+
+    response = query_dynamodb_table(
+        key_condition_expr=key_condition,
+        limit=query_dto.limit,
+        exclusive_start_key={"pk": "MODEL", "sk": cursor} if cursor else None,
+    )
+    models = {
+        str(model): Model(name=str(model), slug=str(model))
+        for model in PROMPT_MODELS
+        if (not prefix or str(model).startswith(prefix)) and (not cursor or str(model) > cursor)
+    }
+    for item in response.get("Items", []):
+        models[item["sk"]] = Model(
+            name=item.get("name") or item["sk"],
+            slug=item["sk"],
+        )
+
+    sorted_models = sorted(models.values(), key=lambda model: model.slug)
+    page = sorted_models[:query_dto.limit]
+    if page and (len(sorted_models) > query_dto.limit or response.get("LastEvaluatedKey")):
+        page[-1].offset = encode_offset({"slug": page[-1].slug})
+    return page
 
 
 def get_popular_tags(query_dto: TagQueryDTO = None) -> list[Tag]:

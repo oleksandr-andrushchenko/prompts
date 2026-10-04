@@ -233,6 +233,11 @@
                    aria-current="page"{% endif %}>Tags</a>
             </li>
             <li class="nav-item">
+                <a class="nav-link px-2 text-muted{% if current_route == "models" %} active{% endif %}"
+                   href="{{ url("models") }}"{% if current_route == "models" %}
+                   aria-current="page"{% endif %}>Models</a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link px-2 text-muted{% if users_active %} active{% endif %}" href="{{ users_url() }}"
                         {% if users_active %} aria-current="page"{% endif %}>Users</a>
             </li>

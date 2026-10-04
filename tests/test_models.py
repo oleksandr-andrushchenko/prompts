@@ -7,6 +7,7 @@ sys.path.insert(0, str(project_root / "shared"))
 sys.path.insert(0, str(project_root / "api-lambda"))
 
 import api_utils
+import shared_utils
 from query_dtos import ModelQueryDTO
 
 
@@ -21,11 +22,11 @@ def test_get_models_queries_registry_partition(monkeypatch):
             "name": "openai-gpt-5-7",
         }]}
 
-    monkeypatch.setattr(api_utils, "query_dynamodb_table", query_dynamodb_table)
+    monkeypatch.setattr(shared_utils, "query_dynamodb_table", query_dynamodb_table)
 
-    models = api_utils.get_models(ModelQueryDTO(prefix="GPT-5.7", limit=5))
+    models = shared_utils.get_models(ModelQueryDTO(prefix="GPT-5.7", limit=5))
 
-    assert models == [api_utils.Model("openai-gpt-5-7", "openai-gpt-5-7")]
+    assert models == [shared_utils.Model("openai-gpt-5-7", "openai-gpt-5-7")]
     assert calls[0]["limit"] == 5
     assert calls[0].get("index_name") is None
 
@@ -46,13 +47,37 @@ def test_model_registry_updates_are_idempotent_upserts(monkeypatch):
 
 
 def test_get_models_combines_static_and_dynamic_catalog(monkeypatch):
-    monkeypatch.setattr(api_utils, "query_dynamodb_table", lambda **_kwargs: {"Items": [{
+    monkeypatch.setattr(shared_utils, "query_dynamodb_table", lambda **_kwargs: {"Items": [{
         "pk": "MODEL",
         "sk": "openai-gpt-5-7",
         "name": "openai-gpt-5-7",
     }]})
 
-    models = api_utils.get_models(ModelQueryDTO(prefix="openai-gpt-5", limit=5))
+    models = shared_utils.get_models(ModelQueryDTO(prefix="openai-gpt-5", limit=5))
 
-    assert api_utils.Model("openai-gpt-5-*", "openai-gpt-5-*") in models
-    assert api_utils.Model("openai-gpt-5-7", "openai-gpt-5-7") in models
+    assert shared_utils.Model("openai-gpt-5-*", "openai-gpt-5-*") in models
+    assert shared_utils.Model("openai-gpt-5-7", "openai-gpt-5-7") in models
+
+
+def test_get_models_paginates_merged_catalog(monkeypatch):
+    calls = []
+
+    def query_dynamodb_table(**kwargs):
+        calls.append(kwargs)
+        return {"Items": [], "LastEvaluatedKey": {"pk": "MODEL", "sk": "unused"}}
+
+    monkeypatch.setattr(shared_utils, "query_dynamodb_table", query_dynamodb_table)
+
+    first_page = shared_utils.get_models(ModelQueryDTO(limit=2))
+    second_page = shared_utils.get_models(ModelQueryDTO(limit=2, offset=first_page[-1].offset))
+
+    assert len(first_page) == len(second_page) == 2
+    assert first_page[-1].slug < second_page[0].slug
+    assert second_page[-1].offset
+    assert calls[1]["exclusive_start_key"] == {"pk": "MODEL", "sk": first_page[-1].slug}
+
+
+def test_model_fragment_propagates_pagination_offset():
+    fragment = project_root / "shared/templates/fragments/model.html"
+
+    assert 'data-offset="{{ model.offset }}"' in fragment.read_text()

@@ -644,6 +644,38 @@ def test_tags_fragment_endpoint_success(guest_client):
     assert response.headers["content-type"].startswith("text/html")
 
 
+def test_models_fragment_endpoint_success(guest_client):
+    response = get(guest_client, "/models-fragment?limit=6")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert pq(response.text)(".model").length == 6
+
+
+def test_models_page_metadata_and_auto_loading(guest_client):
+    response = guest_client.get(f"{WEB_TEST_BASE_URL}/models?limit=6", timeout=30)
+
+    assert response.status_code == 200
+    doc = pq(response.text)
+    schema = json.loads(doc('script[type="application/ld+json"]').text())
+    assert doc("main h1").text() == "Models"
+    assert schema["@type"] == "CollectionPage"
+    assert schema["url"].endswith("/models")
+    assert doc("#models .model").length == 6
+    load_more = doc('.btn-load-more[data-auto-click][data-container="#models"]')
+    assert load_more.length == 1
+
+    next_page = guest_client.get(
+        load_more.attr("data-url"),
+        params={"limit": load_more.attr("data-limit"), "offset": load_more.attr("data-offset")},
+        timeout=30,
+    )
+    assert next_page.status_code == 200
+    next_doc = pq(next_page.text)
+    assert next_doc(".model").length == 6
+    assert doc("#models .model h3").eq(-1).text() < next_doc(".model h3").eq(0).text()
+
+
 @pytest.mark.parametrize(("tag_type", "expected_title", "canonical_suffix"), [
     ("latest", "Latest Tags", "/tags"),
     ("popular", "Popular Tags", "/tags?type=popular"),

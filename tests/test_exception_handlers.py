@@ -158,8 +158,17 @@ class ExceptionHandlerTests(unittest.TestCase):
 
     def test_web_robots_and_sitemap_are_served_for_the_main_domain(self):
         module = next(module for module in self.modules if module.__name__.startswith("web_"))
+        request = Request({
+            "type": "http",
+            "method": "GET",
+            "path": "/robots.txt",
+            "headers": [],
+            "query_string": b"",
+            "server": ("example.com", 443),
+            "scheme": "https",
+        })
 
-        with patch.object(module, "get_static_base_url", return_value="https://static.example.com"):
-            robots = asyncio.run(module.robots_txt())
+        with patch.object(module, "get_static_url", return_value="https://static.example.com/sitemap.xml"):
+            robots = asyncio.run(module.robots_txt(request))
         self.assertIn(b"Allow: /", robots.body)
         self.assertIn(b"Sitemap: https://static.example.com/sitemap.xml", robots.body)
