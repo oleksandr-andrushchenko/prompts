@@ -1,3 +1,4 @@
+from app_config import is_prod
 from api_utils import (
     PromptCommentDTO,
     PromptDTO,
@@ -17,7 +18,6 @@ from api_utils import (
     create_tag_subscription,
     find_tag,
     get_dummy_user_token,
-    is_prod,
     update_prompt_impression,
     update_prompt_status,
     update_dynamodb_item,

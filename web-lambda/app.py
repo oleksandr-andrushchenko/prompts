@@ -1,5 +1,8 @@
 import asyncio
 
+from app_config import (
+    get_allowed_origins, get_indexnow_key, get_static_files_dir, is_prod,
+)
 from notifications import get_access_log
 from query_dtos import TagQueryDTO
 from shared_deps import (
@@ -43,7 +46,6 @@ from web_utils import (
     to_thread,
     PromptQueryDTO,
     PromptCommentQueryDTO,
-    is_prod,
     InvalidTokenError,
     InvalidCodeError,
     CodeExchangeFailedError,
@@ -70,10 +72,8 @@ from web_utils import (
     find_user_impression,
     get_user_url,
     NotAuthenticatedError,
-    get_static_files_dir,
     UserStatus,
     UserBannedError,
-    get_allowed_origins,
     get_redirect_url,
     should_show_popular_prompts,
     get_prompt_related_prompts,
@@ -111,6 +111,13 @@ async def sitemap_xml(request: Request):
     )
 
 
+indexnow_key = get_indexnow_key()
+if indexnow_key:
+    @app.get(f"/{indexnow_key}.txt", name="indexnow-key")
+    async def indexnow_key_file():
+        return PlainTextResponse(indexnow_key)
+
+
 @app.get("/favicon.ico", name="web-favicon")
 async def favicon_ico(request: Request):
     return RedirectResponse(
@@ -141,7 +148,7 @@ if not is_prod():
     @app.middleware("http")
     async def serve_static(request: Request, call_next):
         path = request.url.path.lstrip("/")
-        if "." in path:  # file-like (e.g. robots.txt, sitemap.xml)
+        if "." in path and path != f"{indexnow_key}.txt":  # file-like (e.g. robots.txt, sitemap.xml)
             static_dir = get_static_files_dir()
             file_path = os.path.join(static_dir, path)
             if os.path.isfile(file_path):

@@ -3,18 +3,25 @@ from html.parser import HTMLParser
 from http import HTTPStatus
 from urllib.parse import unquote, urlparse
 
+from app_config import (
+    get_aws_region, get_cloudfront_distribution_id, get_config, get_contact_topic_arn,
+    get_dynamodb_table_name,
+    get_email_files_dir, get_ses_from_email, get_static_base_url,
+    get_static_files_dir, get_static_s3_bucket, get_web_base_url, is_prod,
+)
 from basic_dtos import ContactMessageDTO, FileDTO, ImageFileDTO
 from category_dtos import UpdateCategoryDTO
 from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
     UpdatePromptStatusDTO, UpdateTagDTO,
 )
+from search_engine_submissions import notify_search_engines, submit_sitemap_to_search_engines
 from shared_utils import *
 from shared_utils import (
     Category, Key, Permission, User, add_update_category_published_count_transact,
     find_prompt, find_prompt_by_slug_follow_redirects,
     find_user_by_username_follow_redirects, get_categories, get_models, get_prompts, get_tags,
-    get_dynamodb_table_name, get_web_base_url, logger, query_dynamodb_table,
+    logger, query_dynamodb_table,
 )
 from tag_subscription_dtos import TagSubscriptionDTO
 from validation import validate_category_slug
@@ -190,7 +197,7 @@ def _drop_cdn_cache(*urls) -> dict[str, Any]:
         }
 
     client = _get_cf_client()
-    distribution_id = config.get("cloudformation_districution_id")
+    distribution_id = get_cloudfront_distribution_id()
     response = client.create_invalidation(
         DistributionId=distribution_id,
         InvalidationBatch={
@@ -317,12 +324,7 @@ def generate_sitemap(user: User, req) -> tuple[int, str]:
     if is_prod():
         safe_execute("CF invalidation", _drop_cdn_cache, ["/sitemap.xml"])
 
-    # Notify engines
-    if is_prod():
-        import httpx
-        with httpx.Client(timeout=5.0) as client:
-            safe_execute("Google SM notify", client.get, "https://www.google.com/ping", params={"sitemap": sitemap_url})
-            safe_execute("Bing SM notify", client.get, "https://www.bing.com/ping", params={"sitemap": sitemap_url})
+    safe_execute("Sitemap submission", submit_sitemap_to_search_engines, sitemap_url)
 
     return len(urls), sitemap_url
 
@@ -763,6 +765,13 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
     if "models" in changes:
         prompt.models = list(changes["models"])
 
+    if prompt.status == PromptStatus.PUBLISHED:
+        safe_execute(
+            "Search engine notification",
+            notify_search_engines,
+            get_prompt_url(req, prompt, absolute=True),
+        )
+
 
 def create_prompt_comment(prompt: Prompt, prompt_comment_dto: PromptCommentDTO, cur_user: User,
                           req) -> PromptComment:
@@ -1064,6 +1073,12 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
             dispatch_prompt_published_event(prompt)
         except Exception:
             logger.exception("Unable to dispatch prompt published event")
+    if status == PromptStatus.PUBLISHED:
+        safe_execute(
+            "Search engine notification",
+            notify_search_engines,
+            get_prompt_url(req, prompt, absolute=True),
+        )
 
 
 def create_contact_message(message_dto: ContactMessageDTO, user: User = None) -> ContactMessage:
@@ -1249,22 +1264,6 @@ def update_user_impression(user: User, update_relation_dto: UpdateUserImpression
     dynamodb_transact_write(transacts)
 
 
-def get_email_files_dir() -> str:
-    return config.get("email_files_dir")
-
-
-def get_static_s3_bucket() -> str:
-    return config.get("static_s3_bucket")
-
-
-def get_contact_topic_arn():
-    return config.get("contact_topic_arn")
-
-
-def get_ses_from_email():
-    return config.get("ses_from_email")
-
-
 def dispatch_prompt_published_event(prompt: Prompt) -> None:
     handle_prompt_published_event(PromptPublishedEvent(prompt))
 
@@ -1344,7 +1343,7 @@ def handle_prompt_published_event(event: PromptPublishedEvent) -> None:
                 f"Subscribed interests: {subscribed_tags_text}\n"
                 + "\n".join(f"{tag['name']}: {tag['url']}" for tag in tag_links)
                 + f"\n\nRead it here: {prompt_url}\n\n"
-                  f"Best regards,\n{config.get('site_name', 'The team')}\n"
+                  f"Best regards,\n{get_config().get('site_name', 'The team')}\n"
         )
         html_body = get_html_content("emails/prompt-published-notification.html", {
             "recipient_name": user.name or "there",
@@ -1372,10 +1371,6 @@ def handle_prompt_published_event(event: PromptPublishedEvent) -> None:
                 "Unable to send prompt publication notification",
                 extra={"user_id": user_id, "prompt_id": prompt.id},
             )
-
-
-def get_cf_distribution_id() -> str:
-    return os.getenv("CLOUDFRONT_DISTRIBUTION_ID")
 
 
 @lru_cache

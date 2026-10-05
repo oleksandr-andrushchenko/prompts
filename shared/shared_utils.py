@@ -21,7 +21,7 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from api_route_metadata import API_URL_ROUTES
-from app_config import config, get_config
+import app_config
 from basic_dtos import UserTokenDTO
 from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
 from notifications import configure_telegram_logging
@@ -473,38 +473,6 @@ class UserByOldSlugRequestedError(Exception):
         self.user = user
 
 
-def is_prod():
-    return config.get("app_stage") == "prod"
-
-
-def get_static_files_dir() -> str:
-    return config.get("static_files_dir") or ""
-
-
-def get_web_base_url() -> str:
-    return config.get("web_base_url") or ""
-
-
-def get_api_base_url() -> str:
-    return config.get("api_base_url") or ""
-
-
-def get_static_base_url() -> str:
-    return config.get("static_base_url") or ""
-
-
-def get_aws_region():
-    return config.get("aws_region")
-
-
-def get_dynamodb_endpoint():
-    return config.get("dynamodb_endpoint")
-
-
-def get_dynamodb_table_name():
-    return config.get("dynamodb_table")
-
-
 def tag_subscription_key(tags: list[str]) -> str:
     return "#".join(sorted(set(sanitize_tags(tags))))
 
@@ -525,40 +493,6 @@ def get_user_tag_subscriptions(user: User) -> list[TagSubscription]:
 def get_user_tag_subscription_for_tags(user: User, tags: list[str]) -> TagSubscription | None:
     wanted = tag_subscription_key(tags)
     return next((item for item in get_user_tag_subscriptions(user) if item.key == wanted), None)
-
-
-def get_allowed_origins() -> list[str]:
-    return [
-        config.get("allowed_origin"),
-    ]
-
-
-def get_cognito_domain():
-    return config.get("cognito_domain")
-
-
-def get_cognito_client_id():
-    return config.get("cognito_client_id")
-
-
-def get_cognito_client_secret():
-    return config.get("cognito_client_secret")
-
-
-def get_cognito_user_pool_id():
-    return config.get("cognito_user_pool_id")
-
-
-def get_permission_hierarchy() -> dict[str, list[str]]:
-    return config.get("permission_hierarchy")
-
-
-def get_auth_token_max_age() -> int:
-    return config.get("auth_token_max_age")
-
-
-def get_auth_jwt_secret() -> str:
-    return config.get("auth_jwt_secret")
 
 
 class Lazy:
@@ -582,7 +516,7 @@ def verify_authorization(
     """
     Verify if user has access to perform action requiring `permission`.
     """
-    hierarchy = hierarchy or get_permission_hierarchy()
+    hierarchy = hierarchy or app_config.get_permission_hierarchy()
 
     # Owner check
     if resource:
@@ -685,7 +619,7 @@ def dynamodb_transact_write(transacts: list[dict[str, Any]]):
 def get_logger():
     lg = logging.getLogger("app")
     if not lg.handlers:
-        lg.setLevel(logging.INFO if is_prod() else logging.DEBUG)
+        lg.setLevel(logging.INFO if app_config.is_prod() else logging.DEBUG)
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter(
             "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
@@ -882,7 +816,7 @@ def get_url(req, name: str, absolute: bool = False, **params) -> str:
             url_path = f"{url_path}?{urlencode(items)}"
 
     if absolute:
-        base_url = get_api_base_url() if name in API_URL_ROUTES else get_web_base_url()
+        base_url = app_config.get_api_base_url() if name in API_URL_ROUTES else app_config.get_web_base_url()
         return f"{base_url.rstrip("/")}{url_path}"
 
     return url_path
@@ -890,7 +824,7 @@ def get_url(req, name: str, absolute: bool = False, **params) -> str:
 
 def get_static_url(req, filename, **params) -> str:
     absolute = params.pop("absolute", False)
-    static_base_url = get_static_base_url()
+    static_base_url = app_config.get_static_base_url()
     if static_base_url:
         url_path = get_url(req, "static-file", filename=filename, **params)
         return f"{static_base_url.rstrip('/')}{url_path}"
@@ -982,14 +916,14 @@ def jinja2_order_classes(orders, inverse: bool = False) -> str:
 
 def get_jinja2_env():
     shared_templates_dir = os.path.join(os.path.dirname(__file__), "templates")
-    function_templates_dir = config.get("function_templates_dir", "") or ""
+    function_templates_dir = app_config.get_function_templates_dir()
     templates_dirs = [path for path in function_templates_dir.split(os.pathsep) if path]
     templates_dirs.append(shared_templates_dir)
     jinja2_env = Environment(
         loader=FileSystemLoader(templates_dirs),
         trim_blocks=True,
         lstrip_blocks=True,
-        auto_reload=not is_prod(),
+        auto_reload=not app_config.is_prod(),
         autoescape=select_autoescape(("html", "htm", "xml"))
     )
     jinja2_env.filters.update({
@@ -1001,7 +935,7 @@ def get_jinja2_env():
         "order_classes": jinja2_order_classes,
         "capitalize": capitalize_words,
     })
-    jinja2_env.globals.update(get_config())
+    jinja2_env.globals.update(app_config.get_config())
     jinja2_env.globals.update({
         "static_url": jinja2_static_url,
         "url": jinja2_url,
@@ -1037,16 +971,16 @@ jinja2_env = Lazy(get_jinja2_env)
 @lru_cache
 def get_dynamodb_resource():
     import boto3
-    args = {} if is_prod() else {
-        "region_name": get_aws_region(),
-        "endpoint_url": get_dynamodb_endpoint(),
+    args = {} if app_config.is_prod() else {
+        "region_name": app_config.get_aws_region(),
+        "endpoint_url": app_config.get_dynamodb_endpoint(),
     }
     return boto3.resource("dynamodb", **args)
 
 
 @lru_cache
 def get_dynamodb_table():
-    return get_dynamodb_resource().Table(get_dynamodb_table_name())
+    return get_dynamodb_resource().Table(app_config.get_dynamodb_table_name())
 
 
 def get_html_content(template: str, data: dict[str, Any]) -> str:
@@ -1271,7 +1205,7 @@ def get_user_token_by_auth_jwt_token(token: str | None) -> UserTokenDTO | None:
     try:
         payload = jwt.decode(
             token,
-            get_auth_jwt_secret(),
+            app_config.get_auth_jwt_secret(),
             algorithms=["HS256"],
             options={"verify_aud": False}
         )
@@ -1426,7 +1360,7 @@ def add_increase_tags_rating_transact(transacts: list, tags: list, now):
     for tag in tags:
         transacts.append({
             "Update": {
-                "TableName": get_dynamodb_table_name(),
+                "TableName": app_config.get_dynamodb_table_name(),
                 "Key": {
                     "pk": f"TAG#{tag}",
                     "sk": "META"
@@ -1467,7 +1401,7 @@ def add_decrease_tags_rating_transact(transacts: list, tags: list, now):
     for tag in tags:
         transacts.append({
             "Update": {
-                "TableName": get_dynamodb_table_name(),
+                "TableName": app_config.get_dynamodb_table_name(),
                 "Key": {
                     "pk": f"TAG#{tag}",
                     "sk": "META"
@@ -1495,7 +1429,7 @@ def add_update_category_published_count_transact(transacts: list, category_slug:
     default_count = 0 if delta > 0 else 1
     transacts.append({
         "Update": {
-            "TableName": get_dynamodb_table_name(),
+            "TableName": app_config.get_dynamodb_table_name(),
             "Key": {"pk": "CATEGORY", "sk": category_slug},
             "UpdateExpression": (
                 "SET #published_prompts_count = if_not_exists(#published_prompts_count, :default_count) + :delta, "
@@ -1671,7 +1605,7 @@ def build_dynamodb_put_item_params(
 
     pk, sk = key
     params = {
-        "TableName": get_dynamodb_table_name(),
+        "TableName": app_config.get_dynamodb_table_name(),
         "Item": {
             **values,
             "pk": pk,
@@ -1752,7 +1686,7 @@ def build_dynamodb_update_item_params(
 
     return {
         "Update": {
-            "TableName": get_dynamodb_table_name(),
+            "TableName": app_config.get_dynamodb_table_name(),
             "Key": {"pk": pk, "sk": sk},
             "UpdateExpression": update_expr,
             "ExpressionAttributeNames": expr_attr_names,
@@ -1814,7 +1748,7 @@ def build_dynamodb_delete_item_params(key: tuple[str, str]) -> dict[str, Any]:
 
     return {
         "Delete": {
-            "TableName": get_dynamodb_table_name(),
+            "TableName": app_config.get_dynamodb_table_name(),
             "Key": {
                 "pk": pk,
                 "sk": sk

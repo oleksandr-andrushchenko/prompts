@@ -1,5 +1,6 @@
 import asyncio
 
+from app_config import get_allowed_origins
 from api_utils import (
     get_error_response,
     to_thread,
@@ -38,7 +39,6 @@ from api_utils import (
     NotAuthenticatedError,
     update_user_status,
     UserBannedError,
-    get_allowed_origins,
     find_prompt,
     create_prompt_comment,
     get_prompt_comments,
