@@ -6,8 +6,7 @@ from urllib.parse import unquote, urlparse
 from app_config import (
     get_aws_region, get_cloudfront_distribution_id, get_config, get_contact_topic_arn,
     get_dynamodb_table_name,
-    get_email_files_dir, get_ses_from_email, get_static_base_url,
-    get_static_files_dir, get_static_s3_bucket, get_web_base_url, is_prod,
+    get_email_files_dir, get_ses_from_email, get_static_files_dir, get_static_s3_bucket, get_web_base_url, is_prod,
 )
 from basic_dtos import ContactMessageDTO, FileDTO, ImageFileDTO
 from category_dtos import UpdateCategoryDTO
@@ -20,16 +19,16 @@ from shared_utils import *
 from shared_utils import (
     Category, Key, Permission, User, add_update_category_published_count_transact,
     find_prompt, find_prompt_by_slug_follow_redirects,
-    find_user_by_username_follow_redirects, get_categories, get_models, get_prompts, get_tags,
+    find_user_by_username_follow_redirects, get_categories, get_prompts, get_tags,
     logger, query_dynamodb_table,
 )
 from tag_subscription_dtos import TagSubscriptionDTO
-from validation import validate_category_slug
 from user_dtos import (
     UpdateUserDTO, UpdateUserImpressionDTO, UpdateUserStatusDTO,
     UpdateUserActivitySettingsDTO, UpdateUserInterestsSettingsDTO,
     UserImpressionAction,
 )
+from validation import validate_category_slug
 from web import JSONResponse, RequestValidationError
 
 
@@ -226,6 +225,16 @@ def safe_execute(label: str, func, *args, **kwargs):
     except Exception as e:
         logger.warning(f"{label} failed: {e}")
         return None
+
+
+def _absolute_prompt_url(prompt: Prompt, req=None) -> str:
+    if req is not None:
+        return get_prompt_url(req, prompt, absolute=True)
+    return f"{get_web_base_url().rstrip('/')}/prompts/{prompt.id}"
+
+
+def _notify_search_engines_for_prompt(prompt: Prompt, req=None) -> None:
+    notify_search_engines(_absolute_prompt_url(prompt, req))
 
 
 def generate_sitemap(user: User, req) -> tuple[int, str]:
@@ -768,8 +777,9 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
     if prompt.status == PromptStatus.PUBLISHED:
         safe_execute(
             "Search engine notification",
-            notify_search_engines,
-            get_prompt_url(req, prompt, absolute=True),
+            _notify_search_engines_for_prompt,
+            prompt,
+            req,
         )
 
 
@@ -1076,8 +1086,9 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
     if status == PromptStatus.PUBLISHED:
         safe_execute(
             "Search engine notification",
-            notify_search_engines,
-            get_prompt_url(req, prompt, absolute=True),
+            _notify_search_engines_for_prompt,
+            prompt,
+            req,
         )
 
 
