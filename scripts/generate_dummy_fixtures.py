@@ -1,4 +1,3 @@
-from app_config import is_prod
 from api_utils import (
     PromptCommentDTO,
     PromptDTO,
@@ -27,8 +26,11 @@ from api_utils import (
     upsert_user_by_user_token,
 )
 
+from app_config import is_prod
+from utils import get_web_request
 
-def create_dummy_fixtures(req=None) -> None:
+
+def create_dummy_fixtures() -> None:
     import random
     if is_prod():
         return
@@ -46,8 +48,11 @@ def create_dummy_fixtures(req=None) -> None:
     first_names = ["Lorem", "Ipsum", "Dolor", "Amet", "Consectetur", "Adipiscing", "Elit"]
     last_names = ["Systems", "Patterns", "Scalability", "Reliability", "Architecture", "Telemetry", "Networks"]
     title_openers = ["Designing", "Building", "Exploring", "Modeling", "Operating", "Scaling", "Evolving"]
-    title_subjects = ["Reliable Event Pipelines", "Distributed Data Planes", "Resilient Service Boundaries", "Adaptive Storage Systems", "Observable Control Loops", "Fault Tolerant Workflows", "Composable Platform Primitives"]
-    title_endings = ["with Practical Constraints", "for Fast-Growing Systems", "under Real-World Load", "from First Principles", "without Losing Simplicity", "for Teams That Ship"]
+    title_subjects = ["Reliable Event Pipelines", "Distributed Data Planes", "Resilient Service Boundaries",
+                      "Adaptive Storage Systems", "Observable Control Loops", "Fault Tolerant Workflows",
+                      "Composable Platform Primitives"]
+    title_endings = ["with Practical Constraints", "for Fast-Growing Systems", "under Real-World Load",
+                     "from First Principles", "without Losing Simplicity", "for Teams That Ship"]
     fixture_tag_names = [
         "distributed-systems", "event-driven", "cloud-architecture", "databases",
         "devops", "software-design", "observability", "reliability", "api-design",
@@ -56,10 +61,17 @@ def create_dummy_fixtures(req=None) -> None:
         "data-engineering", "machine-learning", "open-source", "teamwork",
     ]
     unused_fixture_tags = fixture_tag_names.copy()
-    content_openers = ["A useful starting point is", "The practical challenge is", "In a production system", "A resilient design keeps", "The simplest approach begins with", "Over time, teams discover that"]
-    content_subjects = ["clear ownership", "small feedback loops", "explicit boundaries", "measurable failure modes", "repeatable deployments", "well-defined contracts", "careful capacity planning"]
-    content_actions = ["reduces unnecessary coordination", "makes failures easier to isolate", "keeps operational work visible", "creates room for gradual change", "turns assumptions into testable decisions", "helps teams compare trade-offs"]
-    content_endings = ["before the system becomes difficult to change.", "without hiding important constraints.", "while keeping the implementation understandable.", "even when traffic and team size increase.", "so the result remains useful beyond the first release."]
+    content_openers = ["A useful starting point is", "The practical challenge is", "In a production system",
+                       "A resilient design keeps", "The simplest approach begins with",
+                       "Over time, teams discover that"]
+    content_subjects = ["clear ownership", "small feedback loops", "explicit boundaries", "measurable failure modes",
+                        "repeatable deployments", "well-defined contracts", "careful capacity planning"]
+    content_actions = ["reduces unnecessary coordination", "makes failures easier to isolate",
+                       "keeps operational work visible", "creates room for gradual change",
+                       "turns assumptions into testable decisions", "helps teams compare trade-offs"]
+    content_endings = ["before the system becomes difficult to change.", "without hiding important constraints.",
+                       "while keeping the implementation understandable.", "even when traffic and team size increase.",
+                       "so the result remains useful beyond the first release."]
 
     def unique_user_name() -> str:
         while True:
@@ -74,8 +86,10 @@ def create_dummy_fixtures(req=None) -> None:
             if title not in used_prompt_titles:
                 used_prompt_titles.add(title)
                 return title
+
     def random_prompt_tags() -> list[str]:
-        required_tag = unused_fixture_tags.pop(random.randrange(len(unused_fixture_tags))) if unused_fixture_tags else None
+        required_tag = unused_fixture_tags.pop(
+            random.randrange(len(unused_fixture_tags))) if unused_fixture_tags else None
         available_tags = [tag for tag in fixture_tag_names if tag != required_tag]
         extra_tags = random.sample(available_tags, random.randint(0, 2))
         return [required_tag, *extra_tags] if required_tag else random.sample(fixture_tag_names, random.randint(1, 3))
@@ -92,9 +106,9 @@ def create_dummy_fixtures(req=None) -> None:
         template = "\n\n".join(paragraphs)
         while len(template) < 5000:
             paragraph = (f"{random.choice(content_openers)} {random.choice(content_subjects)} "
-                        f"{random.choice(content_actions)} {random.choice(content_endings)} "
-                        f"{random.choice(content_openers)} {random.choice(content_subjects)} "
-                        f"{random.choice(content_actions)} {random.choice(content_endings)}")
+                         f"{random.choice(content_actions)} {random.choice(content_endings)} "
+                         f"{random.choice(content_openers)} {random.choice(content_subjects)} "
+                         f"{random.choice(content_actions)} {random.choice(content_endings)}")
             template += "\n\n" + paragraph
         return template
 
@@ -107,9 +121,9 @@ def create_dummy_fixtures(req=None) -> None:
     update_dynamodb_item((f"USER#{root_user.id}", "META"), {"permissions": [Permission.ROOT]})
     root_user.permissions = [Permission.ROOT]
     for slug, name in (
-        ("code-dev", "Code & Dev"),
-        ("design-image", "Design & Image"),
-        ("other", "Other"),
+            ("code-dev", "Code & Dev"),
+            ("design-image", "Design & Image"),
+            ("other", "Other"),
     ):
         create_category(
             slug,
@@ -132,6 +146,7 @@ def create_dummy_fixtures(req=None) -> None:
                "publishing software like Aldus PageMaker including versions of Lorem Ipsum."),
         address="1600 Pennsylvania Ave NW, Washington, DC 20500"
     )
+    req = get_web_request()
     update_user(root_user, update_user_dto, root_user, req)
     user_token3 = get_dummy_user_token(sub="p3", email="test3@example.com")
     user3 = upsert_user_by_user_token(user_token3)
@@ -254,7 +269,7 @@ def create_dummy_fixtures(req=None) -> None:
         created_prompts.append(generated_prompt)
 
     for tag_name, image_filename in [("distributed-systems", "45e97e68-a321-4657-9956-e942d9d757a7_1279x518.png"),
-                                     ("event-driven", "a167891d-7e91-40d6-a5c4-1a3ddb27dcc2_1575x842.png") ]:
+                                     ("event-driven", "a167891d-7e91-40d6-a5c4-1a3ddb27dcc2_1575x842.png")]:
         tag = find_tag(tag_name)
         update_tag(tag, UpdateTagDTO(
             name=tag_name,
@@ -361,8 +376,8 @@ def create_dummy_fixtures(req=None) -> None:
     for prompt in rejected_prompts:
         created_prompt = create_prompt(prompt, user3)
         update_prompt_status(created_prompt,
-                              UpdatePromptStatusDTO(status=PromptStatus.REJECTED, comment="Some rejection reason"),
-                              root_user, req)
+                             UpdatePromptStatusDTO(status=PromptStatus.REJECTED, comment="Some rejection reason"),
+                             root_user, req)
 
 
 if __name__ == "__main__":

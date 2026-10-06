@@ -227,16 +227,6 @@ def safe_execute(label: str, func, *args, **kwargs):
         return None
 
 
-def _absolute_prompt_url(prompt: Prompt, req=None) -> str:
-    if req is not None:
-        return get_prompt_url(req, prompt, absolute=True)
-    return f"{get_web_base_url().rstrip('/')}/prompts/{prompt.id}"
-
-
-def _notify_search_engines_for_prompt(prompt: Prompt, req=None) -> None:
-    notify_search_engines(_absolute_prompt_url(prompt, req))
-
-
 def generate_sitemap(user: User, req) -> tuple[int, str]:
     verify_authorization(user, Permission.GENERATE_SITEMAP)
 
@@ -777,9 +767,8 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
     if prompt.status == PromptStatus.PUBLISHED:
         safe_execute(
             "Search engine notification",
-            _notify_search_engines_for_prompt,
-            prompt,
-            req,
+            notify_search_engines,
+            get_prompt_url(req, prompt, absolute=True),
         )
 
 
@@ -1086,9 +1075,8 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
     if status == PromptStatus.PUBLISHED:
         safe_execute(
             "Search engine notification",
-            _notify_search_engines_for_prompt,
-            prompt,
-            req,
+            notify_search_engines,
+            get_prompt_url(req, prompt, absolute=True),
         )
 
 

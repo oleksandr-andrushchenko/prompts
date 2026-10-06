@@ -3,6 +3,7 @@ import decimal
 import json
 import logging
 import os
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -11,6 +12,30 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 root_dir = Path(os.getenv("PROJECT_ROOT", Path(__file__).parent.parent))
+
+
+@lru_cache
+def get_web_request():
+    """Return a request backed by the web route registry for scripts."""
+    from web import Application, Request
+    from web_route_metadata import WEB_URL_ROUTES
+
+    app = Application()
+    for name, path in WEB_URL_ROUTES.items():
+        app.add_url_route(path, name)
+
+    return Request({
+        "type": "http",
+        "method": "GET",
+        "path": "/",
+        "root_path": "",
+        "query_string": b"",
+        "scheme": "https",
+        "server": ("localhost", 443),
+        "client": ("127.0.0.1", 0),
+        "headers": [],
+        "app": app,
+    })
 
 
 def get_dynamodb_schema() -> dict:
