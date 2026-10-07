@@ -138,7 +138,9 @@
 
                 {% if prompt.models %}
                     {% for model in prompt.models %}
-                        <span class="badge rounded-pill text-bg-light" title="Model">{{ model }}</span>
+                        <a href="{{ prompts_url(model=model) }}"
+                           class="badge rounded-pill text-bg-light text-decoration-none"
+                           title="Browse prompts for {{ model }}">{{ model }}</a>
                     {% endfor %}
                 {% endif %}
             </div>

@@ -87,6 +87,7 @@ class User:
 class Model:
     name: str
     slug: str
+    published_prompts_count: int = 0
     offset: str | None = None
 
 
@@ -1356,6 +1357,48 @@ def add_delete_tag_combos_transact(transacts: list, prompt: Prompt, slug: str | 
                 add_dynamodb_delete_transact(transacts, tag_combo_key)
 
 
+def add_put_prompt_models_transact(
+        transacts: list,
+        prompt_id: str,
+        models: list[str],
+        status: PromptStatus,
+        rating_sk: int,
+        created_at: int,
+) -> None:
+    for model in dict.fromkeys(models):
+        add_dynamodb_put_transact(
+            transacts,
+            (
+                f"PROMPT_MODEL#{model}#{status}",
+                f"PROMPT#{created_at}#{prompt_id}",
+            ),
+            {
+                "prompt_id": prompt_id,
+                "model": model,
+                "prompt_model_status_pk": f"PROMPT_MODEL#{model}#{status}",
+                "rating_sk": rating_sk,
+                "created_at": created_at,
+            },
+        )
+
+
+def add_delete_prompt_models_transact(
+        transacts: list,
+        prompt_id: str,
+        models: list[str],
+        status: PromptStatus,
+        created_at: int,
+) -> None:
+    for model in dict.fromkeys(models):
+        add_dynamodb_delete_transact(
+            transacts,
+            (
+                f"PROMPT_MODEL#{model}#{status}",
+                f"PROMPT#{created_at}#{prompt_id}",
+            ),
+        )
+
+
 def add_increase_tags_rating_transact(transacts: list, tags: list, now):
     for tag in tags:
         transacts.append({
@@ -1854,6 +1897,29 @@ def decode_offset(token: str) -> dict | None:
 def get_prompts(query_dto: PromptQueryDTO = None, cur_user: User = None) -> list[Prompt]:
     if query_dto is None:
         query_dto = PromptQueryDTO()
+    if query_dto.model:
+        page_query = copy.copy(query_dto)
+        prompts = []
+        wanted_tags = set(query_dto.tags)
+        continuation_offset = None
+        while len(prompts) < query_dto.limit:
+            page_query.limit = query_dto.limit - len(prompts)
+            page = get_prompts_by_model(page_query, cur_user)
+            if not page:
+                break
+            next_offset = page[-1].offset
+            continuation_offset = next_offset
+            prompts.extend(
+                prompt for prompt in page
+                if (not query_dto.category or prompt.category == query_dto.category)
+                and (not wanted_tags or wanted_tags.issubset(set(prompt.tags)))
+            )
+            if not next_offset:
+                break
+            page_query.offset = next_offset
+        if prompts and continuation_offset:
+            prompts[-1].offset = continuation_offset
+        return prompts
     if query_dto.category:
         prompts = (get_popular_prompts(query_dto, cur_user)
                    if query_dto.type == PromptQueryType.POPULAR
@@ -1973,6 +2039,53 @@ def get_popular_prompts(query_dto: PromptQueryDTO = None, cur_user: User = None)
                             else Key("prompt_status_pk").eq(f"PROMPT#{query_dto.status}")),
         map_fn=prompt_from_dynamodb,
     )
+
+
+def get_prompts_by_model(query_dto: PromptQueryDTO, cur_user: User = None) -> list[Prompt]:
+    if not query_dto.model:
+        return get_prompts(query_dto, cur_user)
+    if query_dto.status != PromptStatus.PUBLISHED:
+        if not cur_user:
+            raise NotAuthenticatedError()
+        verify_authorization(cur_user, Permission.READ_NON_PUBLISHED_PROMPT)
+
+    index_name = "PROMPTS_BY_MODEL_STATUS_RATING" if query_dto.type == PromptQueryType.POPULAR else None
+    partition_key = f"PROMPT_MODEL#{query_dto.model}#{query_dto.status}"
+    response = query_dynamodb_table(
+        index_name=index_name,
+        key_condition_expr=Key("prompt_model_status_pk" if index_name else "pk").eq(partition_key),
+        scan_index_forward=False,
+        limit=query_dto.limit,
+        exclusive_start_key=decode_offset(query_dto.offset) if query_dto.offset else None,
+    )
+    relation_items = response.get("Items", [])
+    prompt_ids = [item["prompt_id"] for item in relation_items]
+    if not prompt_ids:
+        return []
+
+    table = get_dynamodb_table()
+    keys = [{"pk": f"PROMPT#{prompt_id}", "sk": "META"} for prompt_id in prompt_ids]
+    prompt_items = []
+    for _ in range(3):
+        batch_response = table.meta.client.batch_get_item(
+            RequestItems={table.name: {"Keys": keys}}
+        )
+        prompt_items.extend(batch_response.get("Responses", {}).get(table.name, []))
+        keys = batch_response.get("UnprocessedKeys", {}).get(table.name, {}).get("Keys", [])
+        if not keys:
+            break
+    if keys:
+        logger.warning("Model prompt batch read left unprocessed keys")
+
+    prompt_items_by_id = {item["id"]: item for item in prompt_items}
+    prompts = [
+        prompt_from_dynamodb(prompt_items_by_id[prompt_id])
+        for prompt_id in prompt_ids
+        if prompt_id in prompt_items_by_id
+    ]
+    if prompts and response.get("LastEvaluatedKey"):
+        prompts[-1].offset = encode_offset(response["LastEvaluatedKey"])
+    return prompts
 
 
 def get_latest_prompts_by_tags(query_dto: PromptQueryDTO = None, cur_user: User = None) -> list[Prompt]:
@@ -2139,7 +2252,7 @@ def get_models(query_dto: ModelQueryDTO | None = None) -> list[Model]:
         exclusive_start_key={"pk": "MODEL", "sk": cursor} if cursor else None,
     )
     models = {
-        str(model): Model(name=str(model), slug=str(model))
+        str(model): Model(name=str(model), slug=str(model), published_prompts_count=0)
         for model in PROMPT_MODELS
         if (not prefix or str(model).startswith(prefix)) and (not cursor or str(model) > cursor)
     }
@@ -2147,6 +2260,7 @@ def get_models(query_dto: ModelQueryDTO | None = None) -> list[Model]:
         models[item["sk"]] = Model(
             name=item.get("name") or item["sk"],
             slug=item["sk"],
+            published_prompts_count=item.get("published_prompts_count", 0),
         )
 
     sorted_models = sorted(models.values(), key=lambda model: model.slug)

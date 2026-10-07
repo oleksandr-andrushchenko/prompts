@@ -123,3 +123,83 @@ def test_related_prompt_batch_read_retries_unprocessed_keys(monkeypatch):
 
     assert result == ["related-1", "related-2"]
     assert client.requests[1] == {"prompts": {"Keys": [unprocessed_key]}}
+
+
+def test_prompt_query_normalizes_model_alias():
+    query = PromptQueryDTO(model="GPT-4o")
+
+    assert query.model == "openai-gpt-4o"
+    assert query.has_params()
+
+
+def test_get_prompts_by_model_preserves_index_order_and_cursor(monkeypatch):
+    last_key = {
+        "pk": "PROMPT_MODEL#openai-gpt-4o#published",
+        "sk": "PROMPT#2#second",
+    }
+    queries = []
+
+    def query_dynamodb_table(**kwargs):
+        queries.append(kwargs)
+        return {
+            "Items": [
+                {"prompt_id": "second"},
+                {"prompt_id": "first"},
+            ],
+            "LastEvaluatedKey": last_key,
+        }
+
+    monkeypatch.setattr(shared_utils, "query_dynamodb_table", query_dynamodb_table)
+
+    class Client:
+        @staticmethod
+        def batch_get_item(**_kwargs):
+            return {
+                "Responses": {"prompts": [
+                    {"id": "first"},
+                    {"id": "second"},
+                ]},
+                "UnprocessedKeys": {},
+            }
+
+    table = SimpleNamespace(name="prompts", meta=SimpleNamespace(client=Client()))
+    monkeypatch.setattr(shared_utils, "get_dynamodb_table", lambda: table)
+    monkeypatch.setattr(
+        shared_utils,
+        "prompt_from_dynamodb",
+        lambda item: SimpleNamespace(id=item["id"], offset=None),
+    )
+
+    result = shared_utils.get_prompts_by_model(PromptQueryDTO(model="gpt-4o", limit=2))
+
+    assert [item.id for item in result] == ["second", "first"]
+    assert shared_utils.decode_offset(result[-1].offset) == last_key
+    assert queries[-1]["index_name"] is None
+
+    shared_utils.get_prompts_by_model(PromptQueryDTO(model="gpt-4o", type="popular", limit=2))
+
+    assert queries[-1]["index_name"] == "PROMPTS_BY_MODEL_STATUS_RATING"
+
+
+def test_model_query_continues_until_other_filters_match(monkeypatch):
+    pages = {
+        None: [SimpleNamespace(id="wrong-tag", category="code-dev", tags=["other"], offset="next")],
+        "next": [SimpleNamespace(id="match", category="code-dev", tags=["wanted"], offset=None)],
+    }
+    offsets = []
+
+    def get_prompts_by_model(query, _cur_user):
+        offsets.append(query.offset)
+        return pages[query.offset]
+
+    monkeypatch.setattr(shared_utils, "get_prompts_by_model", get_prompts_by_model)
+
+    result = shared_utils.get_prompts(PromptQueryDTO(
+        model="gpt-4o",
+        category="code-dev",
+        tags=["wanted"],
+        limit=2,
+    ))
+
+    assert [item.id for item in result] == ["match"]
+    assert offsets == [None, "next"]

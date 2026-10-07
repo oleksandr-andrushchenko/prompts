@@ -13,7 +13,8 @@
         {% set items.values = items.values + [{
             "@type": "ListItem",
             "position": loop.index,
-            "name": model.name
+            "name": model.name,
+            "url": prompts_url(model=model.slug, absolute=True)
         }] %}
     {% endfor %}
     {{- {

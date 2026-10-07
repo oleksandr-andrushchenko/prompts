@@ -43,7 +43,23 @@ def test_model_registry_updates_are_idempotent_upserts(monkeypatch):
     update = transacts[0]["Update"]
     assert update["Key"] == {"pk": "MODEL", "sk": "acme-dream-2-1"}
     assert "if_not_exists" in update["UpdateExpression"]
-    assert "published_prompts_count" not in update["UpdateExpression"]
+    assert "published_prompts_count" in update["UpdateExpression"]
+    assert update["ExpressionAttributeValues"][":zero"] == 0
+
+
+def test_model_published_count_updates_are_deduplicated(monkeypatch):
+    monkeypatch.setattr(api_utils, "get_dynamodb_table_name", lambda: "test-table")
+    transacts = []
+
+    api_utils.add_model_published_count_updates_transact(
+        transacts, ["acme-dream-2-1", "acme-dream-2-1"], -1, 123
+    )
+
+    assert len(transacts) == 1
+    update = transacts[0]["Update"]
+    assert update["Key"] == {"pk": "MODEL", "sk": "acme-dream-2-1"}
+    assert update["ExpressionAttributeValues"][":default_count"] == 1
+    assert update["ExpressionAttributeValues"][":delta"] == -1
 
 
 def test_get_models_combines_static_and_dynamic_catalog(monkeypatch):
@@ -51,12 +67,13 @@ def test_get_models_combines_static_and_dynamic_catalog(monkeypatch):
         "pk": "MODEL",
         "sk": "openai-gpt-5-7",
         "name": "openai-gpt-5-7",
+        "published_prompts_count": 3,
     }]})
 
     models = shared_utils.get_models(ModelQueryDTO(prefix="openai-gpt-5", limit=5))
 
     assert shared_utils.Model("openai-gpt-5-*", "openai-gpt-5-*") in models
-    assert shared_utils.Model("openai-gpt-5-7", "openai-gpt-5-7") in models
+    assert shared_utils.Model("openai-gpt-5-7", "openai-gpt-5-7", 3) in models
 
 
 def test_get_models_paginates_merged_catalog(monkeypatch):

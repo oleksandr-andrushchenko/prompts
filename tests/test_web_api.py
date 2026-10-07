@@ -885,11 +885,16 @@ def test_prompt_create_and_new_page_endpoints_success_and_failure(guest_client):
     assert prompt_item["category"] == "code-dev"
     assert prompt_item["prompt_category_status_pk"] == "PROMPT#code-dev#unpublished"
     assert prompt_item["models"] == ["openai-gpt-4o", "acme-dream-2-1"]
+    model_relation = dynamodb_table.get_item(Key={
+        "pk": "PROMPT_MODEL#acme-dream-2-1#unpublished",
+        "sk": f"PROMPT#{prompt_item['created_at']}#{prompt_item['id']}",
+    }).get("Item")
+    assert model_relation["model"] == "acme-dream-2-1"
     dynamic_model = dynamodb_table.get_item(Key={
         "pk": "MODEL", "sk": "acme-dream-2-1",
     }).get("Item")
     assert dynamic_model["name"] == "acme-dream-2-1"
-    assert "published_prompts_count" not in dynamic_model
+    assert dynamic_model["published_prompts_count"] == 0
     model_response = get(root_client, "/models?prefix=Acme%20Dream")
     assert model_response.status_code == 200, model_response.text
     assert any(model["slug"] == "acme-dream-2-1" for model in model_response.json())
@@ -962,6 +967,8 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert prompt_schema["image"][0].endswith(f"/{PROMPT_IMAGE_FILENAME}")
     assert prompt_schema["thumbnailUrl"].endswith(f"/{PROMPT_IMAGE_FILENAME}")
     assert read_doc('meta[name="robots"]').attr("content") == "index, follow"
+    assert read_doc('a.badge[href$="/prompts?model=openai-gpt-4o"]').text() == "openai-gpt-4o"
+    assert read_doc('a.badge[href$="/prompts?model=acme-dream-2-1"]').text() == "acme-dream-2-1"
     template_code = read_doc("pre.language-text > code.language-text")
     assert len(template_code) == 1
     assert template_code.text(squash_space=False) == PROMPT_TEMPLATE.replace(
@@ -1057,7 +1064,17 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert status_success.status_code == 200, status_success.text
     assert dynamodb_table.get_item(Key={
         "pk": "MODEL", "sk": "acme-dream-2-1",
-    })["Item"]["name"] == "acme-dream-2-1"
+    })["Item"]["published_prompts_count"] == 1
+    model_page = get(guest_client, "/prompts?model=Acme%20Dream%202.1")
+    assert model_page.status_code == 200, model_page.text
+    assert "Updated functional endpoint coverage prompt" in pq(model_page.text)("#prompts").text()
+    popular_model_page = get(guest_client, "/prompts?type=popular&model=acme-dream-2-1")
+    assert popular_model_page.status_code == 200, popular_model_page.text
+    assert "Updated functional endpoint coverage prompt" in pq(popular_model_page.text)("#prompts").text()
+    assert "Item" not in dynamodb_table.get_item(Key={
+        "pk": "PROMPT_MODEL#acme-dream-2-1#unpublished",
+        "sk": f"PROMPT#{get_dynamodb_prompt(prompt_id)['created_at']}#{prompt_id}",
+    })
 
     published_tag_page = get(guest_client, "/prompts?type=latest&status=published&tags=functional-tag")
     assert published_tag_page.status_code == 200
@@ -1069,7 +1086,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert remove_tag_success.status_code == 200, remove_tag_success.text
     assert dynamodb_table.get_item(Key={
         "pk": "MODEL", "sk": "acme-dream-2-1",
-    })["Item"]["name"] == "acme-dream-2-1"
+    })["Item"]["published_prompts_count"] == 0
     removed_tag_page = get(guest_client, "/prompts?type=latest&status=published&tags=functional-tag")
     assert removed_tag_page.status_code == 200
     assert "Updated functional endpoint coverage prompt" not in pq(removed_tag_page.text)("#prompts").text()
@@ -1078,7 +1095,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert republish_success.status_code == 200, republish_success.text
     assert dynamodb_table.get_item(Key={
         "pk": "MODEL", "sk": "acme-dream-2-1",
-    })["Item"]["name"] == "acme-dream-2-1"
+    })["Item"]["published_prompts_count"] == 1
     current_tag_page = get(guest_client, "/prompts?type=latest&status=published&tags=coverage-tag")
     assert current_tag_page.status_code == 200
     assert "Updated functional endpoint coverage prompt" in pq(current_tag_page.text)("#prompts").text()
@@ -1092,6 +1109,18 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert restore_tags_success.status_code == 200, restore_tags_success.text
     restore_publish_success = prompt(root_client, f"/prompts/{prompt_id}/status", json={"status": "published"})
     assert restore_publish_success.status_code == 200, restore_publish_success.text
+    assert dynamodb_table.get_item(Key={
+        "pk": "MODEL", "sk": "acme-dream-2-1",
+    })["Item"]["published_prompts_count"] == 1
+
+    models_page = guest_client.get(
+        f"{WEB_TEST_BASE_URL}/models?prefix=acme-dream-2-1", timeout=30
+    )
+    assert models_page.status_code == 200, models_page.text
+    model_card = pq(models_page.text)("#models .model")
+    assert model_card.length == 1
+    assert "1 published prompt" in model_card.text()
+    assert model_card.find('a[href="/prompts?model=acme-dream-2-1"]')
 
     rename_tag_success = patch(root_client, "/tags/coverage-tag", json={
         "name": "Coverage Tag Updated",

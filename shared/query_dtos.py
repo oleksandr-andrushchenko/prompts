@@ -1,6 +1,7 @@
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 
+from prompt_models import normalize_model_slug
 from validation import validate_category_slug
 
 
@@ -114,6 +115,7 @@ class PromptQueryDTO(BaseQueryDTO):
 
     tags: list[str] = field(default_factory=list)
     category: str | None = None
+    model: str | None = None
     type: PromptQueryType = PromptQueryType.LATEST
     status: PromptStatus = PromptStatus.PUBLISHED
 
@@ -123,10 +125,15 @@ class PromptQueryDTO(BaseQueryDTO):
         self.status = PromptStatus(self.status)
         if self.category is not None:
             self.category = validate_category_slug(self.category)
+        if self.model is not None:
+            self.model = normalize_model_slug(self.model)
+            if not self.model or not 2 <= len(self.model) <= 100:
+                raise ValueError("model must contain between 2 and 100 characters")
 
     def has_params(self):
         return BaseQueryDTO.has_params(self) or bool(
-            self.tags) or self.category is not None or self.type != self.DEFAULT_TYPE or self.status != self.DEFAULT_STATUS
+            self.tags) or self.category is not None or self.model is not None \
+            or self.type != self.DEFAULT_TYPE or self.status != self.DEFAULT_STATUS
 
 
 @dataclass(slots=True)

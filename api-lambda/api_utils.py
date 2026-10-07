@@ -540,16 +540,49 @@ def add_model_registry_updates_transact(
                 "Key": {"pk": "MODEL", "sk": model},
                 "UpdateExpression": (
                     "SET #name = if_not_exists(#name, :name), "
+                    "#published_prompts_count = if_not_exists(#published_prompts_count, :zero), "
                     "#created_at = if_not_exists(#created_at, :now), "
                     "#updated_at = :now"
                 ),
                 "ExpressionAttributeNames": {
                     "#name": "name",
+                    "#published_prompts_count": "published_prompts_count",
                     "#created_at": "created_at",
                     "#updated_at": "updated_at",
                 },
                 "ExpressionAttributeValues": {
                     ":name": model,
+                    ":zero": 0,
+                    ":now": now,
+                },
+            },
+        })
+
+
+def add_model_published_count_updates_transact(
+        transacts: list, models: list[str], delta: int, now: int) -> None:
+    default_count = 0 if delta > 0 else 1
+    for model in dict.fromkeys(models):
+        transacts.append({
+            "Update": {
+                "TableName": get_dynamodb_table_name(),
+                "Key": {"pk": "MODEL", "sk": model},
+                "UpdateExpression": (
+                    "SET #name = if_not_exists(#name, :name), "
+                    "#published_prompts_count = if_not_exists(#published_prompts_count, :default_count) + :delta, "
+                    "#created_at = if_not_exists(#created_at, :now), "
+                    "#updated_at = :now"
+                ),
+                "ExpressionAttributeNames": {
+                    "#name": "name",
+                    "#published_prompts_count": "published_prompts_count",
+                    "#created_at": "created_at",
+                    "#updated_at": "updated_at",
+                },
+                "ExpressionAttributeValues": {
+                    ":name": model,
+                    ":default_count": default_count,
+                    ":delta": delta,
                     ":now": now,
                 },
             },
@@ -608,6 +641,9 @@ def create_prompt(prompt_dto: PromptDTO, cur_user: User, *,
         prompt_item["user_slug"] = cur_user.username
     add_dynamodb_put_transact(transacts, (f"PROMPT#{prompt_id}", "META"), prompt_item, new_pk_only=True)
     add_model_registry_updates_transact(transacts, prompt_dto.models, now)
+    add_put_prompt_models_transact(
+        transacts, prompt_id, prompt_dto.models, status, prompt_item["rating_sk"], now
+    )
 
     add_user_activity_transact(transacts, cur_user, "prompt.created", "prompt", prompt_id, title,
                                f"/prompts/{prompt_id}", cur_user.id, now)
@@ -713,6 +749,7 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
     if published_already and changes.get("status") == PromptStatus.UNPUBLISHED:
         add_decrease_tags_rating_transact(transacts, old_tags, now)
         add_delete_tag_combos_transact(transacts, prompt)
+        add_model_published_count_updates_transact(transacts, old_models, -1, now)
     elif tags_changed:
         add_delete_tag_combos_transact(transacts, prompt)
 
@@ -726,6 +763,22 @@ def update_prompt(prompt: Prompt, update_prompt_dto: UpdatePromptDTO, cur_user: 
 
     status = changes.get("status", prompt.status)
     status_changed = status != old_status
+    removed_models = [model for model in old_models if model not in new_models]
+    added_models = [model for model in new_models if model not in old_models]
+    retained_models = [model for model in new_models if model in old_models]
+    add_delete_prompt_models_transact(
+        transacts, prompt.id, removed_models, old_status, prompt.created_at
+    )
+    add_put_prompt_models_transact(
+        transacts, prompt.id, added_models, status, prompt.rating, prompt.created_at
+    )
+    if status_changed:
+        add_delete_prompt_models_transact(
+            transacts, prompt.id, retained_models, old_status, prompt.created_at
+        )
+        add_put_prompt_models_transact(
+            transacts, prompt.id, retained_models, status, prompt.rating, prompt.created_at
+        )
     if status_changed:
         # Update prompt lists
         changes["prompt_status_pk"] = f"PROMPT#{status}"
@@ -1048,14 +1101,23 @@ def update_prompt_status(prompt: Prompt, update_prompt_status_dto: UpdatePromptS
         add_increase_tags_rating_transact(transacts, prompt.tags, now)
         add_put_tag_combos_transact(transacts, prompt)
         add_update_category_published_count_transact(transacts, prompt.category, 1, now)
+        add_model_published_count_updates_transact(transacts, prompt.models, 1, now)
     elif crossed_published_boundary:
         add_decrease_tags_rating_transact(transacts, prompt.tags, now)
         add_delete_tag_combos_transact(transacts, prompt)
         add_update_category_published_count_transact(transacts, prompt.category, -1, now)
+        add_model_published_count_updates_transact(transacts, prompt.models, -1, now)
 
     changes["prompt_status_pk"] = f"PROMPT#{status}"
     changes["prompt_user_status_pk"] = f"PROMPT#{prompt.user_id}#{status}"
     changes["prompt_category_status_pk"] = f"PROMPT#{prompt.category}#{status}"
+
+    add_delete_prompt_models_transact(
+        transacts, prompt.id, prompt.models, old_status, prompt.created_at
+    )
+    add_put_prompt_models_transact(
+        transacts, prompt.id, prompt.models, status, prompt.rating, prompt.created_at
+    )
 
     add_dynamodb_prompt_update_transact(transacts, prompt, changes)
 
@@ -1185,6 +1247,10 @@ def update_prompt_impression(prompt: Prompt, update_prompt_impression_dto: Updat
             prompt_deltas["rating_sk"] = compute_rating_sk(-1)
 
     add_dynamodb_prompt_update_transact(transacts, prompt, deltas=prompt_deltas)
+    if "rating_sk" in prompt_deltas:
+        add_put_prompt_models_transact(
+            transacts, prompt.id, prompt.models, prompt.status, prompt.rating, prompt.created_at
+        )
 
     add_dynamodb_user_update_transact(transacts, cur_user)
 

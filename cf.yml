@@ -213,6 +213,8 @@ Resources:
           AttributeType: S
         - AttributeName: prompt_category_status_pk
           AttributeType: S
+        - AttributeName: prompt_model_status_pk
+          AttributeType: S
         - AttributeName: prompt_comment_pk
           AttributeType: S
         - AttributeName: prompt_comment_user_pk
@@ -318,6 +320,14 @@ Resources:
         - IndexName: PROMPTS_BY_CATEGORY_STATUS_RATING
           KeySchema:
             - AttributeName: prompt_category_status_pk
+              KeyType: HASH
+            - AttributeName: rating_sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: PROMPTS_BY_MODEL_STATUS_RATING
+          KeySchema:
+            - AttributeName: prompt_model_status_pk
               KeyType: HASH
             - AttributeName: rating_sk
               KeyType: RANGE

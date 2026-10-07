@@ -11,9 +11,11 @@
 } %}
 
 {% set tag_label = prompt_query_tag_names | join(" + ") %}
-{% set subject_label = tag_label or (category.name if category else None) %}
+{% set model_label = prompt_query.model %}
+{% set filter_label = ([tag_label, model_label] | select | join(" + ")) %}
+{% set subject_label = filter_label or (category.name if category else None) %}
 {% set title = ([val_map[prompt_query.type]["title"], subject_label, val_map[prompt_query.status]["title"], site_about]) | select | join(" ") | capitalize %}
-{% if category and tag_label %}
+{% if category and filter_label %}
     {% set title = title ~ " in " ~ category.name %}
 {% endif %}
 {% set meta_robots = "noindex, follow" if prompt_query.status != PromptStatus.PUBLISHED else "index, follow" %}
@@ -56,6 +58,15 @@
             "item": prompts_url(tags=tag_path.values, type=prompt_query.type, absolute=True)
         }] %}
     {% endfor %}
+    {% if prompt_query.model %}
+        {% set breadcrumb_position = breadcrumb_position + 1 %}
+        {% set breadcrumb_items.values = breadcrumb_items.values + [{
+            "@type": "ListItem",
+            "position": breadcrumb_position,
+            "name": prompt_query.model,
+            "item": prompts_url(model=prompt_query.model, type=prompt_query.type, absolute=True)
+        }] %}
+    {% endif %}
     {% if prompt_query.status and prompt_query.status != PromptQueryDTO.DEFAULT_STATUS %}
         {% set breadcrumb_position = breadcrumb_position + 1 %}
         {% set breadcrumb_items.values = breadcrumb_items.values + [{
@@ -101,6 +112,10 @@
         {% set ns.path_tags = ns.path_tags + [tag] %}
         {% set breadcrumbs = breadcrumbs.update({tag | capitalize: prompts_url(tags=ns.path_tags, type=prompt_query.type)}) or breadcrumbs %}
     {% endfor %}
+
+    {% if prompt_query.model %}
+        {% set breadcrumbs = breadcrumbs.update({prompt_query.model: prompts_url(model=prompt_query.model, type=prompt_query.type)}) or breadcrumbs %}
+    {% endif %}
 
     {% if prompt_query.status and prompt_query.status != PromptQueryDTO.DEFAULT_STATUS %}
         {% set breadcrumbs = breadcrumbs.update({prompt_query.status | capitalize: prompts_url(type=prompt_query.status)}) or breadcrumbs %}
@@ -150,8 +165,26 @@
                 {% include "fragments/tags-input.html" %}
             {% endwith %}
 
-            <button class="btn btn-light btn-sm bi bi-search" type="submit"> Search</button>
         </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <small class="text-secondary bi bi-cpu"> Filter by model:</small>
+            {% with input_id="model-input",
+                    field_name="model",
+                    placeholder="Model",
+                    url=url("api-models", absolute=True),
+                    value=[prompt_query.model] if prompt_query.model else [],
+                    class_name="w-auto",
+                    max_items=1,
+                    max_length=100,
+                    normalize_kebab=False,
+                    auto_submit=False,
+                    inject_hidden=True %}
+                {% include "fragments/tags-input.html" %}
+            {% endwith %}
+        </div>
+
+        <button class="btn btn-light btn-sm bi bi-search" type="submit"> Search</button>
 
         {% if cur_user and check_auth(cur_user, Permission.READ_NON_PUBLISHED_PROMPT) %}
             <div class="d-flex align-items-center gap-2">
