@@ -123,6 +123,11 @@ class PromptQueryDTO(BaseQueryDTO):
         BaseQueryDTO.__post_init__(self)
         self.type = PromptQueryType(self.type)
         self.status = PromptStatus(self.status)
+        self.tags = [tag for tag in self.tags if tag]
+        if self.category == "":
+            self.category = None
+        if self.model == "":
+            self.model = None
         if self.category is not None:
             self.category = validate_category_slug(self.category)
         if self.model is not None:

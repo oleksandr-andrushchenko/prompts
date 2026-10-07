@@ -132,6 +132,14 @@ def test_prompt_query_normalizes_model_alias():
     assert query.has_params()
 
 
+def test_prompt_query_ignores_empty_filters():
+    query = PromptQueryDTO(tags=["", "wanted", ""], category="", model="")
+
+    assert query.tags == ["wanted"]
+    assert query.category is None
+    assert query.model is None
+
+
 def test_get_prompts_by_model_preserves_index_order_and_cursor(monkeypatch):
     last_key = {
         "pk": "PROMPT_MODEL#openai-gpt-4o#published",

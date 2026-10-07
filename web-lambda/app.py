@@ -310,10 +310,12 @@ async def _prompts_page(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> H
         prompts,
         tag,
         prompt_query_tags,
+        categories,
     ) = await asyncio.gather(
         to_thread(get_prompts, query_dto, cur_user),
         to_thread(find_tag, tag_slug) if tag_slug else asyncio.sleep(0, result=None),
         asyncio.gather(*(to_thread(find_tag, tag) for tag in query_dto.tags)),
+        to_thread(get_categories),
     )
     if tag and tag_slug and tag.slug != tag_slug:
         raise TagByOldSlugRequestedError(tag_slug, tag)
@@ -323,6 +325,10 @@ async def _prompts_page(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> H
         {"value": slug, "name": name}
         for slug, name in zip(query_dto.tags, prompt_query_tag_names)
     ]
+    category = next(
+        (category for category in categories if category.slug == query_dto.category),
+        None,
+    )
     return get_html_content("prompts.html", {
         "cur_user": cur_user,
         "prompt_query": query_dto,
@@ -330,7 +336,8 @@ async def _prompts_page(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> H
         "prompt_query_tag_items": prompt_query_tag_items,
         "prompts": prompts,
         "tag": tag,
-        "category": find_category(query_dto.category) if query_dto.category else None,
+        "category": category,
+        "categories": categories,
         "tag_subscription": get_user_tag_subscription_for_tags(cur_user,
                                                                query_dto.tags) if cur_user and query_dto.tags else None,
     })

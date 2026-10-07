@@ -264,6 +264,9 @@ def check_prompts(doc, prompts_count: int, unpublished_control: bool, rejected_c
         assert model_el
         assert model_el.attr("data-normalize-kebab") == "false"
         assert model_el.attr("data-inject-hidden") == "true"
+        category_el = form_el('#category-filter')
+        assert category_el
+        assert category_el('option[value="code-dev"]')
     else:
         assert not tags_el
     popular_el = form_el('a[href*="popular"].bi-star')
@@ -1156,7 +1159,9 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
 
     category_prompt_page = get(guest_client, "/prompts?category=code-dev")
     assert category_prompt_page.status_code == 200
-    assert "Updated functional endpoint coverage prompt" in pq(category_prompt_page.text)("#prompts").text()
+    category_prompt_doc = pq(category_prompt_page.text)
+    assert "Updated functional endpoint coverage prompt" in category_prompt_doc("#prompts").text()
+    assert category_prompt_doc('#category-filter option[value="code-dev"][selected]')
     category_tag_prompt_page = get(
         guest_client,
         "/prompts?category=code-dev&tags=functional-tag",
