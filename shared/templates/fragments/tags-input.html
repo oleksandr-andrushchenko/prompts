@@ -9,7 +9,7 @@
        data-max-items="{{ max_items|default(3) }}"
        data-min-length="{{ min_length|default(2) }}"
        data-max-length="{{ max_length|default(40) }}"
-       {% if normalize_kebab|default(true) %}data-normalize-kebab{% endif %}
-       {% if inject_hidden %}data-inject-hidden{% endif %}
-       {% if auto_submit %}data-auto-submit{% endif %}
+       data-normalize-kebab="{{ 'true' if normalize_kebab|default(true) else 'false' }}"
+       data-inject-hidden="{{ 'true' if inject_hidden else 'false' }}"
+       data-auto-submit="{{ 'true' if auto_submit else 'false' }}"
 />

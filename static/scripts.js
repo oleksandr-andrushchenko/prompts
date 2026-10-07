@@ -452,177 +452,181 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
   const inputs = document.querySelectorAll("[data-catalog-input]")
   if (!inputs.length || typeof Tagify === "undefined") return
   inputs.forEach(input => {
-  const url = input.dataset.url
-  const fieldName = input.name
-  const normalizeKebab = input.dataset.hasOwnProperty("normalizeKebab")
-  const injectHidden = input.dataset.hasOwnProperty("injectHidden")
-  const autoSubmit = input.dataset.hasOwnProperty("autoSubmit")
-  const form = input.closest("form")
-  const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;"
-  })[char])
+    try {
+      const url = input.dataset.url
+      const fieldName = input.name
+      const normalizeKebab = input.dataset.normalizeKebab === "true"
+      const injectHidden = input.dataset.injectHidden === "true"
+      const autoSubmit = input.dataset.autoSubmit === "true"
+      const form = input.closest("form")
+      const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      })[char])
 
-  const tagify = new Tagify(input, {
-    whitelist: [],
-    maxTags: Number(input.dataset.maxItems || 3),
-    tagTextProp: "name",
-    enforceWhitelist: false, // validate: tag => /^[0-9A-Za-z-.#]{2,20}$/.test(tag.value) || "Invalid tag",
-    transformTag(tagData) {
-      // Keep an existing tag's slug/name pair intact. Only normalize free-form
-      // values; replacing tags from the `add` event makes Tagify briefly see the
-      // selected value twice and reject/remove it as a duplicate.
-      if (normalizeKebab && (!tagData.name || tagData.name === tagData.value)) {
-        tagData.value = toKebabCase(tagData.value)
-        tagData.name = tagData.value
-      }
-    },
-    templates: {
-      dropdownItem(tagData) {
-        const className = tagData.class ? ` ${tagData.class}` : ""
-        return `<div ${this.getAttributes(tagData)} class="tagify__dropdown__item${className}" tabindex="0" role="option">${escapeHtml(tagData.name || tagData.value)}</div>`
-      }
-    },
-    dropdown: {
-      // enabled: 1,
-      // maxItems: 10,
-      closeOnSelect: true
-    }
-  })
-
-  let controller // for aborting the previous fetch
-  let currentSuggestions = []
-
-  const toTagItem = d => {
-    if (typeof d === "string") return {value: d, name: d}
-    const value = d.slug || d.value || d.name
-    const name = d.name || d.slug || d.value
-    return value ? {value, name} : null
-  }
-
-  if (injectHidden) {
-    input.removeAttribute("name")
-    // container for hidden inputs
-    let hiddenContainer = document.createElement("div")
-    hiddenContainer.style.display = "none"
-    form.appendChild(hiddenContainer)
-
-    // rebuild hidden inputs on change
-    function syncHiddenInputs() {
-      hiddenContainer.innerHTML = ""
-      tagify.value.forEach(tag => {
-        const hidden = document.createElement("input")
-        hidden.type = "hidden"
-        hidden.name = fieldName
-        hidden.value = tag.value
-        hiddenContainer.appendChild(hidden)
-      })
-    }
-
-    tagify.on("change", syncHiddenInputs)
-
-    // Immediately sync hidden inputs for any preloaded tags
-    if (tagify.value.length) {
-      syncHiddenInputs()
-    }
-  }
-
-  // event fired when user types
-  tagify.on("input", onInput)
-
-  function onInput(e) {
-    const value = e.detail.value
-    const prefix = normalizeKebab ? toKebabCase(value) : value.trim()
-    tagify.whitelist = []
-    currentSuggestions = []
-    tagify.dropdown.hide()
-
-    controller && controller.abort()
-
-    if (!prefix) {
-      tagify.loading(false)
-      return
-    }
-
-    controller = new AbortController()
-
-    tagify.loading(true)
-
-    const u = new URL(url, window.location.origin)
-    u.searchParams.set("prefix", prefix)
-    ajaxResponse({
-      url: u.toString(),
-      method: "GET",
-      dataType: "json",
-      signal: controller.signal
-    })
-      .then(async res => {
-        if (!res.ok) {
-          if ([409, 422].includes(res.status)) {
-            const json = await res.json().catch(() => null)
-            if (json?.details) {
-              Object.entries(json.details).forEach(([field, msg]) => {
-                input.classList.add("is-invalid")
-                let feedback = input.nextElementSibling
-                if (!feedback || !feedback.classList.contains("invalid-feedback")) {
-                  feedback = document.createElement("div")
-                  feedback.className = "invalid-feedback"
-                  input.insertAdjacentElement("afterend", feedback)
-                }
-                feedback.textContent = msg
-              })
-            }
-          } else {
-            console.error(`Catalog fetch failed with status ${res.status}`)
+      const tagify = new Tagify(input, {
+        whitelist: [],
+        maxTags: Number(input.dataset.maxItems || 3),
+        tagTextProp: "name",
+        enforceWhitelist: false, // validate: tag => /^[0-9A-Za-z-.#]{2,20}$/.test(tag.value) || "Invalid tag",
+        transformTag(tagData) {
+          // Keep an existing tag's slug/name pair intact. Only normalize free-form
+          // values; replacing tags from the `add` event makes Tagify briefly see the
+          // selected value twice and reject/remove it as a duplicate.
+          if (normalizeKebab && (!tagData.name || tagData.name === tagData.value)) {
+            tagData.value = toKebabCase(tagData.value)
+            tagData.name = tagData.value
           }
+        },
+        templates: {
+          dropdownItem(tagData) {
+            const className = tagData.class ? ` ${tagData.class}` : ""
+            return `<div ${this.getAttributes(tagData)} class="tagify__dropdown__item${className}" tabindex="0" role="option">${escapeHtml(tagData.name || tagData.value)}</div>`
+          }
+        },
+        dropdown: {
+          // enabled: 1,
+          // maxItems: 10,
+          closeOnSelect: true
+        }
+      })
+
+      let controller // for aborting the previous fetch
+      let currentSuggestions = []
+
+      const toTagItem = d => {
+        if (typeof d === "string") return {value: d, name: d}
+        const value = d.slug || d.value || d.name
+        const name = d.name || d.slug || d.value
+        return value ? {value, name} : null
+      }
+
+      if (injectHidden) {
+        input.removeAttribute("name")
+        // container for hidden inputs
+        let hiddenContainer = document.createElement("div")
+        hiddenContainer.style.display = "none"
+        form.appendChild(hiddenContainer)
+
+        // rebuild hidden inputs on change
+        function syncHiddenInputs() {
+          hiddenContainer.innerHTML = ""
+          tagify.value.forEach(tag => {
+            const hidden = document.createElement("input")
+            hidden.type = "hidden"
+            hidden.name = fieldName
+            hidden.value = tag.value
+            hiddenContainer.appendChild(hidden)
+          })
+        }
+
+        tagify.on("change", syncHiddenInputs)
+
+        // Immediately sync hidden inputs for any preloaded tags
+        if (tagify.value.length) {
+          syncHiddenInputs()
+        }
+      }
+
+      // event fired when user types
+      tagify.on("input", onInput)
+
+      function onInput(e) {
+        const value = e.detail.value
+        const prefix = normalizeKebab ? toKebabCase(value) : value.trim()
+        tagify.whitelist = []
+        currentSuggestions = []
+        tagify.dropdown.hide()
+
+        controller && controller.abort()
+
+        if (!prefix) {
           tagify.loading(false)
-          return null
+          return
         }
 
-        // success: clear any previous error state
-        input.classList.remove("is-invalid")
-        const feedback = input.nextElementSibling
-        if (feedback && feedback.classList.contains("invalid-feedback")) {
-          feedback.remove()
-        }
+        controller = new AbortController()
 
-        // parse JSON
-        return await res.json()
-      })
-      .then(data => {
-        if (!data) return
-        currentSuggestions = data.map(toTagItem).filter(Boolean)
-        tagify.whitelist = currentSuggestions
-        tagify.loading(false)
-        tagify.dropdown.show(value)
-      })
-      .catch(err => {
-        if (err.name !== "AbortError") console.error(err)
-        tagify.loading(false)
-      })
-  }
+        tagify.loading(true)
+
+        const u = new URL(url, window.location.origin)
+        u.searchParams.set("prefix", prefix)
+        ajaxResponse({
+          url: u.toString(),
+          method: "GET",
+          dataType: "json",
+          signal: controller.signal
+        })
+          .then(async res => {
+            if (!res.ok) {
+              if ([409, 422].includes(res.status)) {
+                const json = await res.json().catch(() => null)
+                if (json?.details) {
+                  Object.entries(json.details).forEach(([field, msg]) => {
+                    input.classList.add("is-invalid")
+                    let feedback = input.nextElementSibling
+                    if (!feedback || !feedback.classList.contains("invalid-feedback")) {
+                      feedback = document.createElement("div")
+                      feedback.className = "invalid-feedback"
+                      input.insertAdjacentElement("afterend", feedback)
+                    }
+                    feedback.textContent = msg
+                  })
+                }
+              } else {
+                console.error(`Catalog fetch failed with status ${res.status}`)
+              }
+              tagify.loading(false)
+              return null
+            }
+
+            // success: clear any previous error state
+            input.classList.remove("is-invalid")
+            const feedback = input.nextElementSibling
+            if (feedback && feedback.classList.contains("invalid-feedback")) {
+              feedback.remove()
+            }
+
+            // parse JSON
+            return await res.json()
+          })
+          .then(data => {
+            if (!data) return
+            currentSuggestions = data.map(toTagItem).filter(Boolean)
+            tagify.whitelist = currentSuggestions
+            tagify.loading(false)
+            tagify.dropdown.show(value)
+          })
+          .catch(err => {
+            if (err.name !== "AbortError") console.error(err)
+            tagify.loading(false)
+          })
+      }
 
 
-  if (autoSubmit) {
-    tagify.on("change", () => form.requestSubmit())
-  }
+      if (autoSubmit) {
+        tagify.on("change", () => form.requestSubmit())
+      }
 
-  // A value that is still being typed has not been added to tagify.value yet.
-  // Commit it when the containing form is submitted so users do not have to
-  // press Enter before submitting a form with a single new tag.
-  if (form && !autoSubmit) {
-    form.addEventListener("submit", () => {
-      const pendingValue = tagify.DOM.input.textContent.trim()
-      if (!pendingValue) return
+      // A value that is still being typed has not been added to tagify.value yet.
+      // Commit it when the containing form is submitted so users do not have to
+      // press Enter before submitting a form with a single new tag.
+      if (form && !autoSubmit) {
+        form.addEventListener("submit", () => {
+          const pendingValue = tagify.DOM.input.textContent.trim()
+          if (!pendingValue) return
 
-      tagify.addTags(pendingValue)
-      tagify.DOM.input.textContent = ""
-      tagify.updateValueByDOMTags()
-    }, true)
-  }
+          tagify.addTags(pendingValue)
+          tagify.DOM.input.textContent = ""
+          tagify.updateValueByDOMTags()
+        }, true)
+      }
+    } catch (err) {
+      console.error(`Failed to initialize catalog input #${input.id}`, err)
+    }
   })
 })()
 

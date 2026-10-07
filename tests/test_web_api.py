@@ -258,6 +258,12 @@ def check_prompts(doc, prompts_count: int, unpublished_control: bool, rejected_c
     tags_el = form_el('#tags-input')
     if tags_control:
         assert tags_el
+        assert tags_el.attr("data-normalize-kebab") == "true"
+        assert tags_el.attr("data-inject-hidden") == "true"
+        model_el = form_el('#model-input')
+        assert model_el
+        assert model_el.attr("data-normalize-kebab") == "false"
+        assert model_el.attr("data-inject-hidden") == "true"
     else:
         assert not tags_el
     popular_el = form_el('a[href*="popular"].bi-star')
