@@ -261,7 +261,7 @@
                     <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
                         <h2 class="h5 mb-0">Prompt template</h2>
                         <button class="btn btn-sm btn-outline-secondary copy-prompt-template" type="button"
-                                aria-label="Copy prompt template">
+                                aria-label="Copy prompt template" style="min-width: 8rem;">
                             <i class="bi bi-copy" aria-hidden="true"></i>
                             <span>Copy</span>
                         </button>
@@ -289,18 +289,21 @@
                             {% endif %}
                         {% endfor %}
                     </dl>
-                    <pre class="language-{{ template_language }} mb-3"><code id="prompt-template"
-                                                                             class="language-{{ template_language }}">{{ prompt.template.content }}</code></pre>
+                    {% if prompt.params %}
+                        <p class="small text-secondary mb-2">Replace the <code>${…}</code> placeholders with your values before using this prompt. See <a href="#prompt-params-heading" class="link-secondary">parameters and defaults</a> below.</p>
+                    {% endif %}
+                    <pre class="language-{{ template_language }} rounded p-3 lh-base mb-0"{% if prompt.template.format == 'text' %} style="white-space: pre-wrap; overflow-wrap: anywhere;"{% endif %}><code id="prompt-template" class="language-{{ template_language }}"{% if prompt.template.format == 'text' %} style="white-space: inherit; overflow-wrap: inherit;"{% endif %}>{{ prompt.template.content }}</code></pre>
+                    <span id="prompt-copy-status" class="visually-hidden" role="status"></span>
                 </section>
 
                 {% if prompt.params %}
                     <section class="prompt-params mb-4" aria-labelledby="prompt-params-heading">
                         <h2 class="h5 mb-3" id="prompt-params-heading">Parameters</h2>
+                        <p class="small text-secondary">Replace each placeholder with your own value, or use its default when one is provided.</p>
                         <div class="list-group">
                             {% for param in prompt.params %}
                                 <div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
-                                    <code>{{ '${' }}{{ param.name }}{% if param.default is defined %}:
-                                        {{ param.default }}{% endif %}{{ '}' }}</code>
+                                    <code class="text-break">{{ '${' }}{{ param.name }}{% if param.default is defined %}:{{ param.default }}{% endif %}{{ '}' }}</code>
                                     <span>
                                         <span class="fw-semibold">{{ param.name }}</span>
                                         {% if param.default is defined %}
@@ -391,4 +394,51 @@
             </div>
         </section>
     {% endif %}
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const button = document.querySelector(".copy-prompt-template")
+        const template = document.getElementById("prompt-template")
+        const status = document.getElementById("prompt-copy-status")
+        const icon = button.querySelector("i")
+        const label = button.querySelector("span")
+        let resetTimer
+
+        button.addEventListener("click", async () => {
+          clearTimeout(resetTimer)
+          button.disabled = true
+          status.textContent = ""
+          try {
+            if (navigator.clipboard?.writeText) {
+              await navigator.clipboard.writeText(template.textContent)
+            } else {
+              const textarea = document.createElement("textarea")
+              textarea.value = template.textContent
+              textarea.style.position = "fixed"
+              textarea.style.opacity = "0"
+              document.body.appendChild(textarea)
+              try {
+                textarea.select()
+                if (!document.execCommand("copy")) throw new Error("Copy failed")
+              } finally {
+                textarea.remove()
+              }
+            }
+            icon.className = "bi bi-check-lg"
+            label.textContent = "Copied"
+            status.textContent = "Prompt template copied."
+          } catch {
+            icon.className = "bi bi-exclamation-circle"
+            label.textContent = "Copy failed"
+            status.textContent = "Could not copy. Select the prompt text and copy it manually."
+          } finally {
+            button.disabled = false
+            button.focus({preventScroll: true})
+            resetTimer = setTimeout(() => {
+              icon.className = "bi bi-copy"
+              label.textContent = "Copy"
+            }, 2000)
+          }
+        })
+      })
+    </script>
 {% endblock %}
