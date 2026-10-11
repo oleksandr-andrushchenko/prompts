@@ -438,6 +438,7 @@ async def _update_user(update_user_dto: UpdateUserDTODep, user: UserDep, cur_use
 async def user_prompts_fragment(user: UserDep, query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> str:
     return get_html_content("fragments/prompts.html", {
         "query": query_dto,
+        "prompt_img_sizes": {"1400px": "250px", "992px": "220px", "768px": "338px", "576px": "248px", "default": "calc(100vw - 26px)"},
         "prompts": get_latest_prompts_by_user(user, query_dto, cur_user),
         "cur_user": cur_user,
     })

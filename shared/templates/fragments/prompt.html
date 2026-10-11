@@ -8,7 +8,7 @@
 {% set h_display_size = h_display_size | default(5) %}
 {% set image_column_size = image_column_size | default({"def":12,"md":3}) if image else 0 %}
 {% set prompt_user = prompt.get_user() %}
-{% set prompt_img_sizes = prompt_img_sizes | default({"768px": "25vw", "default": "100vw"}) %}
+{% set prompt_img_sizes = prompt_img_sizes | default({"1400px": "250px", "1200px": "220px", "992px": "300px", "768px": "338px", "576px": "248px", "default": "calc(100vw - 26px)"}) %}
 
 <div class="prompt col"{% if prompt.offset %} data-offset="{{ prompt.offset }}"{% endif %}>
     <article class="card h-100 text-bg-light shadow-sm overflow-hidden">

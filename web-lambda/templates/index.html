@@ -30,7 +30,7 @@
             <form action="{{ prompts_url() }}" role="search" aria-label="Find prompts"
                   class="col-xl-10 mx-auto position-relative text-start">
                 <label for="home-search" class="visually-hidden">Find prompts by category, tag, or model</label>
-                <div class="input-group flex-nowrap">
+                <div class="input-group flex-nowrap" style="min-height: 2.75rem;">
                     <input id="home-search" type="text" class="form-control bg-body"
                            placeholder="Search prompts by category, tag, or model…" autocomplete="off"
                            aria-describedby="home-search-help"
@@ -123,7 +123,7 @@
                                 vert_gap=0,
                                 h_display_size=6,
                                 horizontal=True,
-                                prompt_img_sizes={"1400px": "86px", "1200px": "71px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
+                                prompt_img_sizes={"1400px": "130px", "1200px": "115px", "992px": "115px", "768px": "85px", "576px": "248px", "default": "calc(100vw - 26px)"} %}
                             {% include "fragments/prompts.html" %}
                         {% endwith %}
                     </div>
@@ -147,7 +147,7 @@
                             h_tag_size=3,
                             h_display_size=5,
                             image_column_size={"def":3,"md":2},
-                            user_avatar_img_sizes={"1400px": "49px", "1200px": "40px", "992px": "56px", "768px": "96px", "default": "120px"} %}
+                            user_avatar_img_sizes={"1400px": "52px", "992px": "44px", "768px": "52px", "576px": "34px", "default": "calc(20vw - 21px)"} %}
                         {% include "fragments/users.html" %}
                     {% endwith %}
 
@@ -176,7 +176,7 @@
                 <div id="prompts" class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3 mb-2"
                      data-masonry='{"percentPosition": true }'>
                     {% with prompts=latest_prompts,
-                            prompt_img_sizes={"1400px": "196px", "1200px": "166px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
+                            prompt_img_sizes={"1400px": "250px", "1200px": "220px", "992px": "300px", "768px": "338px", "576px": "248px", "default": "calc(100vw - 26px)"} %}
                         {% include "fragments/prompts.html" %}
                     {% endwith %}
                 </div>
@@ -244,6 +244,7 @@
           }
         })
         finder.DOM.scope.classList.add("home-prompt-finder", "align-items-center")
+        finder.DOM.input.classList.add("text-nowrap")
         finder.DOM.input.setAttribute("aria-label", "Find prompts by category, tag, or model")
         finder.DOM.input.setAttribute("aria-describedby", status.id)
 

@@ -253,7 +253,8 @@
             {% endwith %}
 
             {% with h_tag_size=2,
-                prompt_img_sizes={"1400px": "196px", "1200px": "166px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
+                prompt_img_sizes={"1400px": "250px", "1200px": "220px", "992px": "300px", "768px": "338px", "576px": "248px", "default": "calc(100vw - 26px)"},
+                eager_prompt_images=1 %}
                 {% include "fragments/prompts.html" %}
             {% endwith %}
         </section>

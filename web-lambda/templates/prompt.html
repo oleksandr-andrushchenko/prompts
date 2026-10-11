@@ -178,14 +178,16 @@
                         {% for result in other_results %}
                             <div class="mb-3">
                                 {% if result.format == 'video' %}
-                                    <video class="w-100 rounded" controls preload="metadata"
+                                    {% set video_width, video_height = img_dims(result.preview_filename | default(None)) %}
+                                    <video class="w-100 h-auto rounded" controls preload="none"
+                                           {% if video_width and video_height %}width="{{ video_width }}" height="{{ video_height }}"{% endif %}
                                            {% if result.preview_filename is defined %}poster="{{ static_url(result.preview_filename, absolute=True) }}"{% endif %}
                                            aria-label="Example video {{ loop.index }}">
                                         <source src="{{ static_url(result.filename, absolute=True) }}">
                                         Your browser does not support video playback.
                                     </video>
                                 {% elif result.format == 'audio' %}
-                                    <audio class="w-100" controls preload="metadata"
+                                    <audio class="w-100" controls preload="none"
                                            aria-label="Example audio {{ loop.index }}">
                                         <source src="{{ static_url(result.filename, absolute=True) }}">
                                         Your browser does not support audio playback.
@@ -218,7 +220,11 @@
                             <div class="carousel-inner rounded">
                                 {% for filename in result_images %}
                                     <div class="carousel-item{% if loop.first %} active{% endif %}">
-                                        {% with filename=filename, alt=prompt.title ~ " output " ~ loop.index, img_class="d-block w-100 img-fluid", img_style="max-height: 70vh; object-fit: contain;", figure=False %}
+                                        {% with filename=filename, alt=prompt.title ~ " output " ~ loop.index,
+                                                img_class="d-block w-100 img-fluid", img_style="max-height: 70vh; object-fit: contain;",
+                                                loading="eager" if loop.first else "lazy", decoding="async",
+                                                fetchpriority="high" if loop.first else None,
+                                                img_sizes={"1400px": "696px", "992px": "616px", "768px": "696px", "576px": "516px", "default": "calc(100vw - 24px)"}, figure=False %}
                                             {% include "fragments/image.html" %}
                                         {% endwith %}
                                     </div>

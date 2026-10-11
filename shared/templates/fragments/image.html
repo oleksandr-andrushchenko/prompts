@@ -7,6 +7,7 @@
     {% set height = height | default(None) %}
     {% set loading = loading | default(None) %}
     {% set decoding = decoding | default(None) %}
+    {% set fetchpriority = fetchpriority | default(None) %}
     {% set img_sizes = img_sizes | default({"default": "100vw"}) %}
     {% set img_sizes_value = namespace(parts=[]) %}
     {% for breakpoint, size in img_sizes.items() if breakpoint != "default" %}
@@ -68,7 +69,8 @@
             {% if width %} width="{{ width }}"{% endif %}
          {% if height %}height="{{ height }}"{% endif %}
             {% if loading %} loading="{{ loading }}"{% endif %}
-         {% if decoding %}decoding="{{ decoding }}"{% endif %}>
+         {% if decoding %}decoding="{{ decoding }}"{% endif %}
+         {% if fetchpriority %}fetchpriority="{{ fetchpriority }}"{% endif %}>
 </picture>
 
 {% if figure %}

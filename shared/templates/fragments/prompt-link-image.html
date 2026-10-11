@@ -4,7 +4,7 @@
         img_class="img-fluid w-100 h-100 object-fit-cover" if horizontal else "card-img-top w-100 h-auto",
         img_style="width:100%; height:100%; object-fit:cover;" if horizontal else None,
         figure=False,
-        loading="lazy",
+        loading=prompt_image_loading | default("lazy"),
         decoding="async",
         img_sizes=prompt_img_sizes %}
         {% include "fragments/image.html" %}

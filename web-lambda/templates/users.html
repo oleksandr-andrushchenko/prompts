@@ -120,7 +120,7 @@
     {% if users %}
         <div class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3" id="users"
              data-masonry='{"percentPosition": true }'>
-            {% with user_avatar_img_sizes={"1200px": "127px", "992px": "80px", "768px": "120px", "default": "25vw"} %}
+            {% with user_avatar_img_sizes={"1400px": "52px", "992px": "44px", "768px": "52px", "576px": "34px", "default": "calc(20vw - 21px)"} %}
                 {% include "fragments/users.html" %}
             {% endwith %}
         </div>

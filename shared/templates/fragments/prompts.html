@@ -1,3 +1,5 @@
 {% for prompt in prompts %}
-    {% include "fragments/prompt.html" %}
+    {% with prompt_image_loading="eager" if loop.index <= (eager_prompt_images | default(0)) else "lazy" %}
+        {% include "fragments/prompt.html" %}
+    {% endwith %}
 {% endfor %}

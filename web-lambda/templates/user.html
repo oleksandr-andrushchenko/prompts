@@ -249,7 +249,7 @@
             {% if prompts %}
                 <div id="prompts" class="{{ {"def": 1, "sm": 2, "lg": 4} | row_classes }} g-3"
                      data-masonry='{"percentPosition": true }'>
-                    {% with prompt_img_sizes={"1400px": "196px", "1200px": "166px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
+                    {% with prompt_img_sizes={"1400px": "250px", "992px": "220px", "768px": "338px", "576px": "248px", "default": "calc(100vw - 26px)"} %}
                         {% include "fragments/prompts.html" %}
                     {% endwith %}
                 </div>
