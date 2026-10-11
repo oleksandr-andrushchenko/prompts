@@ -258,7 +258,7 @@ async def index(cur_user: OptCurUserDep) -> str:
         to_thread(get_popular_tags, TagQueryDTO(limit=12)),
         to_thread(get_latest_published_prompts, limit=latest_prompts_query.limit),
         to_thread(get_popular_published_prompts, limit=8),
-        to_thread(get_popular_active_users, limit=11 if should_show_become_an_author else 10),
+        to_thread(get_popular_active_users, limit=7 if should_show_become_an_author else 9),
         to_thread(get_categories),
     )
     return get_html_content("index.html", {

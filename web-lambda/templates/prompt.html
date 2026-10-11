@@ -116,10 +116,10 @@
     <div class="row g-4">
         <div class="{{ {"def": 12, "lg": 8} | col_classes }}">
             <article class="mb-4">
-                <header class="mb-4">
-                    <dl class="small mb-3 d-flex flex-wrap align-items-center gap-3" aria-label="Prompt classification">
+                <header>
+                    <dl class="small mb-2 d-flex flex-wrap align-items-center gap-2" aria-label="Prompt classification">
                         {% if prompt.category %}
-                            <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div class="d-flex flex-wrap align-items-center gap-1">
                                 <dt class="text-secondary fw-normal"><i class="bi bi-folder" aria-hidden="true"></i>
                                     Category
                                 </dt>
@@ -130,7 +130,7 @@
                             </div>
                         {% endif %}
                         {% if prompt.models %}
-                            <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div class="d-flex flex-wrap align-items-center gap-1">
                                 <dt class="text-secondary fw-normal"><i class="bi bi-cpu"
                                                                         aria-hidden="true"></i> {{ 'Model' if prompt.models | length == 1 else 'Models' }}
                                 </dt>
@@ -144,10 +144,10 @@
                             </div>
                         {% endif %}
                         {% if prompt.tags %}
-                            <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div class="d-flex flex-wrap align-items-center gap-1">
                                 <dt class="text-secondary fw-normal"><i class="bi bi-tags" aria-hidden="true"></i> Tags
                                 </dt>
-                                <dd class="mb-0 d-flex flex-wrap gap-2">
+                                <dd class="mb-0 d-flex flex-wrap gap-1">
                                     {% for tag in prompt.tags %}
                                         <a href="{{ prompts_url(tags=[tag]) }}"
                                            class="link-secondary text-break text-decoration-none">{{ tag }}</a>
@@ -157,7 +157,7 @@
                         {% endif %}
                     </dl>
 
-                    <h1 class="mb-3">{{ prompt.title }}</h1>
+                    <h1 class="mb-0">{{ prompt.title }}</h1>
 
                     {% with rating_size="fs-4", rating_extended=True %}
                         {% include "fragments/prompt-rating.html" %}
@@ -266,9 +266,12 @@
                             <span>Copy</span>
                         </button>
                     </div>
-                    <dl class="small mb-3 d-flex flex-wrap align-items-center gap-3" aria-label="Prompt template details">
+                    <dl class="small mb-3 d-flex flex-wrap align-items-center gap-3"
+                        aria-label="Prompt template details">
                         <div class="d-flex flex-wrap align-items-center gap-2">
-                            <dt class="text-secondary fw-normal"><i class="bi bi-file-earmark-code" aria-hidden="true"></i> Format</dt>
+                            <dt class="text-secondary fw-normal"><i class="bi bi-file-earmark-code"
+                                                                    aria-hidden="true"></i> Format
+                            </dt>
                             <dd class="mb-0 d-flex flex-wrap align-items-center gap-2">
                                 <span class="badge text-bg-light border">{{ prompt.template.format | capitalize }}</span>
                                 {% include "fragments/parameterized-label.html" %}
@@ -277,11 +280,17 @@
                         {% for label, icon, ports in [('Inputs', 'box-arrow-in-right', prompt.inputs), ('Outputs', 'box-arrow-right', prompt.outputs)] %}
                             {% if ports %}
                                 <div class="d-flex flex-wrap align-items-center gap-2">
-                                    <dt class="text-secondary fw-normal"><i class="bi bi-{{ icon }}" aria-hidden="true"></i> {{ label }}</dt>
+                                    <dt class="text-secondary fw-normal"><i class="bi bi-{{ icon }}"
+                                                                            aria-hidden="true"></i> {{ label }}</dt>
                                     <dd class="mb-0 d-flex flex-wrap gap-1">
                                         {% for port in ports %}
-                                            <span class="badge text-bg-light border text-wrap text-break"{% if port.description %} title="{{ port.description }}"{% endif %}>
-                                                {{ port.name }} ({{ port.formats | join(', ') or 'unspecified' }}){% if label == 'Inputs' %} · {{ 'Required' if port.required else 'Optional' }}{% endif %}{% if port.default is defined %} · Default: {{ port.default }}{% endif %}
+                                            <span class="badge text-bg-light border text-wrap text-break"
+                                                    {% if port.description %} title="{{ port.description }}"{% endif %}>
+                                                {{ port.name }} ({{ port.formats | join(', ') or 'unspecified' }})
+                                                {% if label == 'Inputs' %} ·
+                                                    {{ 'Required' if port.required else 'Optional' }}{% endif %}
+                                                {% if port.default is defined %} · Default:
+                                                    {{ port.default }}{% endif %}
                                             </span>
                                         {% endfor %}
                                     </dd>
@@ -290,20 +299,30 @@
                         {% endfor %}
                     </dl>
                     {% if prompt.params %}
-                        <p class="small text-secondary mb-2">Replace the <code>${…}</code> placeholders with your values before using this prompt. See <a href="#prompt-params-heading" class="link-secondary">parameters and defaults</a> below.</p>
+                        <p class="small text-secondary mb-2">Replace the <code>${…}</code> placeholders with your values
+                            before using this prompt. See <a href="#prompt-params-heading" class="link-secondary">parameters
+                                and defaults</a> below.</p>
                     {% endif %}
-                    <pre class="language-{{ template_language }} rounded p-3 lh-base mb-0"{% if prompt.template.format == 'text' %} style="white-space: pre-wrap; overflow-wrap: anywhere;"{% endif %}><code id="prompt-template" class="language-{{ template_language }}"{% if prompt.template.format == 'text' %} style="white-space: inherit; overflow-wrap: inherit;"{% endif %}>{{ prompt.template.content }}</code></pre>
+                    <pre class="language-{{ template_language }} rounded p-3 lh-base mb-0"
+                            {% if prompt.template.format == 'text' %}
+                         style="white-space: pre-wrap; overflow-wrap: anywhere;"{% endif %}><code id="prompt-template"
+                                                                                                  class="language-{{ template_language }}"
+                            {% if prompt.template.format == 'text' %}
+                                                                                                  style="white-space: inherit; overflow-wrap: inherit;"{% endif %}>{{ prompt.template.content }}</code></pre>
                     <span id="prompt-copy-status" class="visually-hidden" role="status"></span>
                 </section>
 
                 {% if prompt.params %}
                     <section class="prompt-params mb-4" aria-labelledby="prompt-params-heading">
                         <h2 class="h5 mb-3" id="prompt-params-heading">Parameters</h2>
-                        <p class="small text-secondary">Replace each placeholder with your own value, or use its default when one is provided.</p>
+                        <p class="small text-secondary">Replace each placeholder with your own value, or use its default
+                            when one is provided.</p>
                         <div class="list-group">
                             {% for param in prompt.params %}
                                 <div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
-                                    <code class="text-break">{{ '${' }}{{ param.name }}{% if param.default is defined %}:{{ param.default }}{% endif %}{{ '}' }}</code>
+                                    <code class="text-break">
+                                        {{ '${' }}{{ param.name }}{% if param.default is defined %}:
+                                            {{ param.default }}{% endif %}{{ '}' }}</code>
                                     <span>
                                         <span class="fw-semibold">{{ param.name }}</span>
                                         {% if param.default is defined %}
