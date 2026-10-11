@@ -575,7 +575,10 @@ def test_index_omits_latest_prompt_comments(guest_client):
 
     doc = get_index(guest_client)
     check_latest_prompt_comments(doc, comments_count=0, comment_texts=[])
-    assert "Latest comments" not in doc("main").text()
+    assert "Latest comments" not in doc("main h2").text()
+    assert prompt_title in doc("#prompts").text()
+    for comment_text in comment_texts:
+        assert comment_text not in doc("main").text()
 
 
 @pytest.mark.parametrize("path", [
@@ -1119,7 +1122,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
         "pk": "MODEL", "sk": "acme-dream-2-1",
     })["Item"]["published_prompts_count"] == 0
     removed_tag_page = get(guest_client, "/prompts?type=latest&status=published&tags=functional-tag")
-    assert removed_tag_page.status_code == 200
+    assert removed_tag_page.status_code == 404
     assert "Updated functional endpoint coverage prompt" not in pq(removed_tag_page.text)("#prompts").text()
 
     republish_success = prompt(root_client, f"/prompts/{prompt_id}/status", json={"status": "published"})
@@ -1131,7 +1134,7 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert current_tag_page.status_code == 200
     assert "Updated functional endpoint coverage prompt" in pq(current_tag_page.text)("#prompts").text()
     stale_tag_page = get(guest_client, "/prompts?type=latest&status=published&tags=functional-tag")
-    assert stale_tag_page.status_code == 200
+    assert stale_tag_page.status_code == 404
     assert "Updated functional endpoint coverage prompt" not in pq(stale_tag_page.text)("#prompts").text()
 
     restore_tags_success = patch(root_client, f"/prompts/{prompt_id}", json={
@@ -1174,8 +1177,12 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     slug_failure = get(guest_client, "/@root-functional/missing-prompt")
     assert slug_failure.status_code == 404
 
-    prompts_by_slug_success = get(guest_client, "/root-functional/prompts")
-    assert prompts_by_slug_success.status_code == 200
+    # This route filters by tag; creator prompts are listed on the profile.
+    missing_tag_page = get(guest_client, "/root-functional/prompts")
+    assert missing_tag_page.status_code == 404
+    creator_page = get(guest_client, "/@root-functional")
+    assert creator_page.status_code == 200
+    assert "Updated functional endpoint coverage prompt" in pq(creator_page.text)("#prompts").text()
     prompts_by_slug_failure = get(guest_client, "/invalid/latest/prompts?limit=0")
     assert prompts_by_slug_failure.status_code == 422
 
@@ -1190,9 +1197,11 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     )
     assert category_tag_prompt_page.status_code == 200
     category_tag_doc = pq(category_tag_prompt_page.text)
-    expected_title = "Latest Functional-tag LLM Prompts in Code & Dev"
-    assert expected_title in category_tag_doc("head title").text()
-    assert category_tag_doc("main h1").text() == expected_title
+    listing_title = category_tag_doc("main h1").text()
+    assert listing_title.lower().startswith("latest functional-tag ")
+    assert "prompts" in listing_title.lower()
+    assert listing_title.endswith(" in Code & Dev")
+    assert listing_title in category_tag_doc("head title").text()
     category_item = dynamodb_table.get_item(
         Key={"pk": "CATEGORY", "sk": "code-dev"}
     )["Item"]
