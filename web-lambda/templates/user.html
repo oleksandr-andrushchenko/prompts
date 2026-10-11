@@ -182,7 +182,7 @@
             <div class="{{ {"def": 12, "lg": 8} | col_classes }}">
                 {% if user.about %}
                     <div class="mb-4">
-                        <h2 class="h5 mb-2 text-decoration-underline">About</h2>
+                        <h2 class="h5 mb-3">About</h2>
                         <div class="card-text">{{ user.about }}</div>
                     </div>
                 {% endif %}
@@ -192,7 +192,7 @@
 
             <div class="{{ {"def": 12, "lg": 4} | col_classes }}">
                 {% if user.published_prompts_count %}
-                    {% with header="Enjoy this author’s work?" %}
+                    {% with header="Enjoy this creator’s work?" %}
                         {% include "fragments/bmc-donate.html" %}
                     {% endwith %}
                 {% endif %}
@@ -202,7 +202,7 @@
         </div>
 
         <section>
-            <h2 class="h5 mb-2 text-decoration-underline">{{ prompts_title }}</h2>
+            <h2 class="h5 mb-3">{{ prompts_title }}</h2>
 
             {% if cur_user and check_auth(cur_user, Permission.READ_NON_PUBLISHED_PROMPT, user) %}
                 <div class="d-flex justify-content-start align-items-center gap-1 mb-2">

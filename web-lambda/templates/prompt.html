@@ -174,7 +174,7 @@
                 {% set other_results = prompt.result_files|rejectattr('format', 'equalto', 'image')|list %}
                 {% if other_results %}
                     <section class="mb-4" aria-label="Prompt execution results">
-                        <h2 class="h5 mb-2">Example results</h2>
+                        <h2 class="h5 mb-3">Example results</h2>
                         {% for result in other_results %}
                             <div class="mb-3">
                                 {% if result.format == 'video' %}
@@ -201,7 +201,7 @@
 
                 {% if result_images %}
                     <section class="prompt-results mb-4">
-                        <h2 class="h5 mb-2 text-decoration-underline">Screenshots</h2>
+                        <h2 class="h5 mb-3">Example images</h2>
                         {% set carousel_id = "prompt-output-carousel-" ~ prompt.id %}
                         <div id="{{ carousel_id }}" class="carousel slide" aria-label="Prompt output images">
                             {% if result_images|length > 1 %}
@@ -241,8 +241,8 @@
                 {% endif %}
 
                 <section class="prompt-content mb-4">
-                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                        <h2 class="h5 text-decoration-underline mb-0">Prompt template</h2>
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                        <h2 class="h5 mb-0">Prompt template</h2>
                         <button class="btn btn-sm btn-outline-secondary copy-prompt-template" type="button"
                                 aria-label="Copy prompt template">
                             <i class="bi bi-copy" aria-hidden="true"></i>
@@ -254,7 +254,7 @@
 
                 {% if prompt.params %}
                     <section class="prompt-params mb-4" aria-labelledby="prompt-params-heading">
-                        <h2 class="h5 text-decoration-underline" id="prompt-params-heading">Parameters</h2>
+                        <h2 class="h5 mb-3" id="prompt-params-heading">Parameters</h2>
                         <div class="list-group">
                             {% for param in prompt.params %}
                                 <div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -275,7 +275,7 @@
             </article>
 
             <section class="prompt-comments mb-4">
-                <h3 class="h5 text-decoration-underline">Comments &mdash; {{ prompt.comments_count }}</h3>
+                <h2 class="h5 mb-3">Comments &mdash; {{ prompt.comments_count }}</h2>
 
                 <div class="d-flex flex-column gap-4">
                     {% include "fragments/prompt-comment-form.html" %}
@@ -301,7 +301,7 @@
         <div class="{{ {"def": 12, "lg": 4} | col_classes }}">
             <aside class="sticky-lg-top" style="top: 1rem;">
                 <section class="mb-4">
-                    <h2 class="h5 text-decoration-underline">Author</h2>
+                    <h2 class="h5 mb-3">Creator</h2>
                     {% with user=author, h_tag_size=3, image_column_size={"def":3,"md":2}, user_bg_color="light", user_shadow=True %}
                         {% include "fragments/user.html" %}
                     {% endwith %}
@@ -331,7 +331,10 @@
 
     {% if related_prompts %}
         <section>
-            <h2 class="h5 text-decoration-underline">Related prompts</h2>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <h2 class="h5 mb-0">Related prompts</h2>
+                <a href="{{ prompts_url() }}" class="btn btn-light btn-sm">Browse all prompts</a>
+            </div>
             <div id="related-prompts" class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3"
                  data-masonry='{"percentPosition": true }'>
                 {% with prompts=related_prompts,

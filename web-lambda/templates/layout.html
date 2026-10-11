@@ -168,7 +168,7 @@
                             <li class="nav-item">
                                 <a class="nav-link{% if cur_user.status == UserStatus.BANNED %} disabled{% endif %} bi bi-pencil-square"
                                    href="{{ url("new-prompt") }}">
-                                    New prompt
+                                    Share a prompt
                                 </a>
                             </li>
                         {% endif %}
@@ -192,7 +192,7 @@
                         <li class="nav-item">
                             <a class="nav-link bi bi-pencil-square"
                                href="{{ url("login", redirect_url=url("new-prompt")) }}" rel="nofollow">
-                                New prompt
+                                Share a prompt
                             </a>
                         </li>
                         <li class="nav-item">
