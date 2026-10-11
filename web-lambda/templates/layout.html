@@ -9,6 +9,7 @@
     "https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;700&display=swap",
     static_url('styles.css', _=css_cache_counter),
 ] %}
+{% set meta_desc = html_to_text(meta_desc or site_desc) | truncate(155, False, '...', 0) %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -37,7 +38,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>{{ meta_title or site_title }}</title>
-    <meta name="description" content="{{ (meta_desc or site_desc) | truncate(155, True, '...') }}"/>
+    <meta name="description" content="{{ meta_desc }}"/>
     <meta name="author" content="{{ meta_author }}"/>
     {% if meta_rating_value is defined %}
         <meta name="ratingValue" content="{{ meta_rating_value }}"/>
@@ -59,15 +60,17 @@
     {% set social_url = og_url or meta_canonical_url or url("index", absolute=True) %}
     {% set image_filename = og_img_filename or meta_img_filename or site_img_filename %}
     {% set social_image_url = image_filename if image_filename and (image_filename.startswith('http://') or image_filename.startswith('https://')) else static_url(image_filename, absolute=True) if image_filename else None %}
+    {% set social_image_alt = og_img_alt or meta_img_alt or (site_img_title or site_name if image_filename == site_img_filename else meta_title or site_title) %}
+    {% set social_description = html_to_text(og_desc) if og_desc else meta_desc %}
     <meta property="og:title" content="{{ og_title or meta_title or site_title }}"/>
-    <meta property="og:description" content="{{ og_desc or meta_desc or site_desc }}"/>
+    <meta property="og:description" content="{{ social_description }}"/>
     <meta property="og:type" content="{{ og_type or "website" }}"/>
     <meta property="og:url" content="{{ social_url }}"/>
     <meta property="og:site_name" content="{{ site_name }}"/>
     {% if social_image_url %}
         <meta property="og:image" content="{{ social_image_url }}"/>
         <meta property="og:image:alt"
-              content="{{ og_img_alt or meta_img_alt or meta_title or site_img_title or site_title }}"/>
+              content="{{ social_image_alt }}"/>
     {% endif %}
     {% set img_width, img_height = img_dims(image_filename) %}
     {% if img_width and img_height %}
@@ -75,11 +78,12 @@
         <meta property="og:image:height" content="{{ img_height }}"/>
     {% endif %}
 
-    <meta name="twitter:card" content="{{ twitter_card or "summary_large_image" }}"/>
+    <meta name="twitter:card" content="{{ twitter_card or ('summary_large_image' if social_image_url else 'summary') }}"/>
     <meta name="twitter:title" content="{{ og_title or meta_title or site_title }}"/>
-    <meta name="twitter:description" content="{{ og_desc or meta_desc or site_desc }}"/>
+    <meta name="twitter:description" content="{{ social_description }}"/>
     {% if social_image_url %}
         <meta name="twitter:image" content="{{ social_image_url }}"/>
+        <meta name="twitter:image:alt" content="{{ social_image_alt }}"/>
     {% endif %}
 
     {% if og_type == "article" %}

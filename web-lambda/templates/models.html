@@ -2,10 +2,10 @@
 
 {% set title = "Models" %}
 {% set subtitle = "AI models supported by catalog prompts" %}
-{% set meta_title = title ~ " | " ~ site_name %}
+{% set meta_title = "AI Models & Prompt Templates | " ~ site_name %}
 {% set meta_robots = "index, follow" %}
 {% set meta_canonical_url = url("models", absolute=True) %}
-{% set meta_desc = [title, subtitle, site_desc] | select | join('. ') | truncate(155, True, '...') %}
+{% set meta_desc = "Browse AI models on " ~ site_name ~ ". Find prompts and reusable templates for the model you use, with example results to help you choose." %}
 
 {% block meta_schema %}
     {% set items = namespace(values=[]) %}

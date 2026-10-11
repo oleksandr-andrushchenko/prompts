@@ -22,7 +22,10 @@
 {% set subtitle = category.description if category else ([val_map[prompt_query.type]["subtitle"], tag_label, val_map[prompt_query.status]["subtitle"], site_about]) | select | join(" ") | capitalize %}
 {% set meta_title = title ~ " | " ~ site_name %}
 {% set meta_canonical_url = prompts_url(query=prompt_query, tags=prompt_query.tags|sort, absolute=True) %}
-{% set meta_desc = [title, subtitle, site_desc] | select | join('. ') | truncate(155, True, '...') %}
+{% set listing_description = "Browse " ~ title ~ " on " ~ site_name ~ "." %}
+{% set meta_desc = listing_description ~ " " ~ (html_to_text(category.description) if category and category.description else "Explore reusable templates and example results, and adapt a prompt to your needs.") %}
+{% set og_img_filename = category.image_filename if category else None %}
+{% set og_img_alt = category.name ~ " AI prompts" if category and category.image_filename else None %}
 {% block meta_schema %}
     {% set items = namespace(values=[]) %}
     {% for prompt in prompts %}
