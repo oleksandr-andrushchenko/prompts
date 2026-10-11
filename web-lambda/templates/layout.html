@@ -139,6 +139,11 @@
                                 {% if prompts_active %} aria-current="page"{% endif %}>Prompts</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link{% if categories_active %} active{% endif %}"
+                           href="{{ url('categories') }}"{% if categories_active %}
+                           aria-current="page"{% endif %}>Categories</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link bi bi-currency-dollar{% if current_route == "earn" %} active{% endif %}"
                            href="{{ url("earn") }}"{% if current_route == "earn" %} aria-current="page"{% endif %}>
                             Earn</a>
@@ -161,7 +166,7 @@
                     {% if cur_user %}
                         {% if check_auth(cur_user, Permission.CREATE_PROMPT) %}
                             <li class="nav-item">
-                                <a class="nav-link{% if cur_user.status == UserStatus.BANNED %} disabled{% endif %} bi bi-pencil-fill"
+                                <a class="nav-link{% if cur_user.status == UserStatus.BANNED %} disabled{% endif %} bi bi-pencil-square"
                                    href="{{ url("new-prompt") }}">
                                     New prompt
                                 </a>
@@ -185,7 +190,7 @@
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link bi bi-pencil-fill"
+                            <a class="nav-link bi bi-pencil-square"
                                href="{{ url("login", redirect_url=url("new-prompt")) }}" rel="nofollow">
                                 New prompt
                             </a>

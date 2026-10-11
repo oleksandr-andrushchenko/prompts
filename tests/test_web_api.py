@@ -526,7 +526,7 @@ def test_regular_user_can_create_prompt_comment():
     assert resp.json().endswith(f"/prompts/{prompt_id}")
 
 
-def test_index_shows_latest_prompt_comments(guest_client):
+def test_index_omits_latest_prompt_comments(guest_client):
     prompt_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
     now = int(time.time() * 1000)
@@ -573,13 +573,8 @@ def test_index_shows_latest_prompt_comments(guest_client):
         comment_texts.append(comment_text)
 
     doc = get_index(guest_client)
-    check_latest_prompt_comments(doc, comments_count=3, comment_texts=list(reversed(comment_texts[-3:])))
-
-    comments = [pq(el).text() for el in doc("#latest-prompt-comments .prompt-comment").items()]
-    assert comment_texts[5] in comments[0]
-    assert comment_texts[3] in comments[-1]
-    assert comment_texts[0] not in doc("#latest-prompt-comments").text()
-    assert prompt_title in doc("#latest-prompt-comments").text()
+    check_latest_prompt_comments(doc, comments_count=0, comment_texts=[])
+    assert "Latest comments" not in doc("main").text()
 
 
 @pytest.mark.parametrize("path", [

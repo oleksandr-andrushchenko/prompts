@@ -78,7 +78,6 @@ from web_utils import (
     should_show_popular_prompts,
     get_prompt_related_prompts,
     get_prompt_comments,
-    get_latest_prompt_comments,
     get_user_by_auth_token,
     get_tag_url,
     find_tag,
@@ -248,29 +247,28 @@ async def tag_redirect_exception_handler(request: Request, exc: TagByOldSlugRequ
 @route("get", "index", response_class=HTMLResponse)
 async def index(cur_user: OptCurUserDep) -> str:
     latest_prompts_query = PromptQueryDTO()
-    latest_prompt_comments_query = PromptCommentQueryDTO(limit=3)
     should_show_become_an_author = (cur_user and cur_user.published_prompts_count == 0) or not cur_user
     (
         popular_tags,
         latest_prompts,
         popular_prompts,
-        latest_prompt_comments,
         popular_users,
+        categories,
     ) = await asyncio.gather(
-        to_thread(get_popular_tags, TagQueryDTO(limit=40)),
+        to_thread(get_popular_tags, TagQueryDTO(limit=12)),
         to_thread(get_latest_published_prompts, limit=latest_prompts_query.limit),
         to_thread(get_popular_published_prompts, limit=8),
-        to_thread(get_latest_prompt_comments, latest_prompt_comments_query),
         to_thread(get_popular_active_users, limit=11 if should_show_become_an_author else 10),
+        to_thread(get_categories),
     )
     return get_html_content("index.html", {
         "cur_user": cur_user,
         "popular_tags": popular_tags,
+        "categories": categories,
         "latest_prompts_query": latest_prompts_query,
         "latest_prompts": latest_prompts,
         "popular_prompts": popular_prompts,
         "show_popular_prompts": should_show_popular_prompts(latest_prompts, popular_prompts),
-        "latest_prompt_comments": latest_prompt_comments,
         "popular_users": popular_users,
         "should_show_become_an_author": should_show_become_an_author,
     })

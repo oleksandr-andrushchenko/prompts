@@ -20,3 +20,4 @@
 - Keep source-specific import scripts, exports, overrides, and other source artifacts untracked under existing ignore rules. Do not name or describe import sources in committed documentation or reusable application code; keep committed guidance and comments source-neutral.
 - Do not rely on wildcard imports or accidental re-exports for new dependencies; import names explicitly and remove imports that are not referenced.
 - Prefer native Bootstrap classes and components for UI changes; avoid modifying `static/styles.css` unless the requirement cannot be implemented cleanly with Bootstrap.
+- Keep `static/scripts.js` limited to JavaScript used in more than one place. Put page-specific scripts in the owning page's template (for example, homepage scripts in `web-lambda/templates/index.html`). Initialize inline scripts after their dependencies are available, using `DOMContentLoaded` when dependencies load with `defer`.

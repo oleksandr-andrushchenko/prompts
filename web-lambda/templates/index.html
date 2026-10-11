@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
-{% set layout_assets = {"masonry": true} %}
+{% set layout_assets = {"masonry": true, "tagify": true} %}
+
 {% set meta_title = site_name ~ " - " ~ site_short_desc %}
 {% set meta_desc = meta_desc or site_desc %}
 {% set main_class = "" %}
@@ -18,66 +19,128 @@
 {% endblock %}
 
 {% block content %}
-    {% if False and site_img_filename %}
-        {% with filename=site_img_filename, alt=site_about, figure=True %}
-            {% include "fragments/image.html" %}
-        {% endwith %}
-    {% endif %}
-
-    <section class="py-5 text-bg-warning overflow-hidden mb-4">
+    <section class="py-5 text-bg-warning mb-4">
         <div class="container text-center">
-            <h1 class="d-inline">{{ site_name }} <i class="bi bi-{{ site_icon }}"></i></h1>
-            <span class="mt-2 fw-bold mb-3">&mdash; {{ site_short_desc }}</span>
-            <p class="mt-3 mb-4">{{ site_desc }}</p>
-            <div class="d-flex flex-wrap align-items-center justify-content-center gap-1">
-                <a href="{{ prompts_url() }}" class="btn btn-dark">
-                    <i class="bi bi-compass" aria-hidden="true"></i>
-                    Explore prompts
-                </a>
-                <a href="{{ users_url() }}" class="btn btn-dark btn-sm">
-                    <i class="bi bi-people" aria-hidden="true"></i>
-                    Meet the community
-                </a>
-            </div>
+            <h1>{{ site_short_desc }}</h1>
+            <p>{{ site_desc }}</p>
+            {% set search_categories = namespace(items=[]) %}
+            {% for category in categories %}
+                {% set search_categories.items = search_categories.items + [{"slug": category.slug, "name": category.name}] %}
+            {% endfor %}
+            <form action="{{ prompts_url() }}" role="search" aria-label="Find prompts"
+                  class="col-xl-10 mx-auto position-relative text-start">
+                <label for="home-search" class="visually-hidden">Find prompts by category, tag, or model</label>
+                <div class="input-group flex-nowrap">
+                    <input id="home-search" type="text" class="form-control bg-body"
+                           placeholder="Search prompts by category, tag, or model…" autocomplete="off"
+                           aria-describedby="home-search-help"
+                           data-categories='{{ search_categories.items | tojson }}'
+                           data-tags-url="{{ url('api-tags', absolute=True) }}"
+                           data-models-url="{{ url('api-models', absolute=True) }}">
+                    <a href="{{ prompts_url() }}" class="btn btn-dark d-flex align-items-center gap-2">
+                        <i class="bi bi-compass d-none d-sm-inline-block" aria-hidden="true"></i>
+                        <span class="d-sm-none">Browse</span>
+                        <span class="d-none d-sm-inline">Browse all prompts</span>
+                    </a>
+                    <a href="{{ url('new-prompt') if cur_user else url('login', redirect_url=url('new-prompt')) }}"
+                       class="btn btn-primary d-flex align-items-center gap-2"
+                            {% if not cur_user %} rel="nofollow"{% endif %}>
+                        <i class="bi bi-pencil-square d-none d-sm-inline-block" aria-hidden="true"></i>
+                        <span class="d-sm-none">Create</span>
+                        <span class="d-none d-sm-inline">Share a prompt</span>
+                    </a>
+                </div>
+                <div id="home-search-help" class="small invisible position-absolute top-100 start-0 end-0"
+                     role="status"></div>
+            </form>
+            <p class="mt-4 mb-0">
+                More than <span class="badge rounded-pill text-bg-dark">{{ "{:,}".format(prompts_count | int) }}</span>
+                prompts to explore
+            </p>
         </div>
     </section>
 
     <div class="container">
-        <section class="mb-4">
-            <h2 class="h5 mb-2 text-decoration-underline">Popular tags</h2>
-            {% if popular_tags %}
-                <div class="{{ {"def": 2, "sm": 3, "md": 4} | row_classes }} g-3 mb-2"
-                     data-masonry='{"percentPosition": true }'>
-                    {% for tag in popular_tags[:20] %}
-                        {% include "fragments/tag.html" %}
+        {% set homepage_categories = categories | selectattr('published_prompts_count', 'gt', 0)
+                | sort(attribute='published_prompts_count', reverse=True) | list %}
+        {% if homepage_categories %}
+            <section class="mb-4" aria-labelledby="browse-categories-heading">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <h2 id="browse-categories-heading" class="h5 mb-0">Browse by category</h2>
+                    <a href="{{ url('categories') }}" class="btn btn-light btn-sm">View all categories</a>
+                </div>
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3">
+                    {% for category in homepage_categories[:8] %}
+                        <div class="col">
+                            <article class="card h-100 text-bg-light shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <h3 class="h5 card-title">
+                                        <a href="{{ prompts_url(category=category.slug) }}"
+                                           class="stretched-link link-body-emphasis text-decoration-none">{{ category.name }}</a>
+                                    </h3>
+                                    <p class="card-text small flex-grow-1">{{ category.description }}</p>
+                                    <p class="card-text small text-secondary mb-0">
+                                        {{ "{:,}".format(category.published_prompts_count) }}
+                                        prompt{% if category.published_prompts_count != 1 %}s{% endif %}
+                                    </p>
+                                </div>
+                            </article>
+                        </div>
                     {% endfor %}
                 </div>
-
-                {% for tag in popular_tags[20:] %}
-                    <a href="{{ prompts_url(tags=[tag.slug]) }}" class="btn btn-light btn-sm tag mb-1">
-                        <h3 class="h6 fw-normal mb-0">{{ tag.name }} &mdash; {{ tag.prompts_count }}</h3>
-                    </a>
-                {% endfor %}
-
-                <a href="{{ url("tags") }}?type=popular" class="btn btn-light btn-sm bi bi-tags">
-                    See all popular tags
-                </a>
-                <a href="{{ url("tags") }}" class="btn btn-light btn-sm bi bi-tags">
-                    See all tags
-                </a>
+            </section>
+        {% endif %}
+        <section class="mb-4">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <h2 class="h5 mb-0">Popular tags</h2>
+                <a href="{{ url('tags') }}" class="btn btn-light btn-sm">View all tags</a>
+            </div>
+            {% if popular_tags %}
+                <div class="d-flex flex-wrap gap-2">
+                    {% for tag in popular_tags[:12] %}
+                        <a href="{{ prompts_url(tags=[tag.slug]) }}" class="btn btn-light btn-sm rounded-pill">
+                            {{ tag.name }}
+                            <span class="text-secondary">{{ "{:,}".format(tag.prompts_count) }}</span>
+                        </a>
+                    {% endfor %}
+                </div>
             {% else %}
                 <div>N/A</div>
             {% endif %}
         </section>
 
+        {% if show_popular_prompts %}
+            <section class="mb-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <h2 class="h5 mb-0">Popular prompts</h2>
+                    <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}" class="btn btn-light btn-sm">View popular prompts</a>
+                </div>
+                {% if popular_prompts %}
+                    <div id="popular-prompts" class="{{ {"def": 1, "sm": 2} | row_classes }} g-3 mb-2"
+                         data-masonry='{"percentPosition": true }'>
+                        {% with prompts=popular_prompts,
+                                preview=False,
+                                vert_gap=0,
+                                h_display_size=6,
+                                horizontal=True,
+                                prompt_img_sizes={"1400px": "86px", "1200px": "71px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
+                            {% include "fragments/prompts.html" %}
+                        {% endwith %}
+                    </div>
+
+                {% else %}
+                    <div>N/A</div>
+                {% endif %}
+            </section>
+        {% endif %}
+
         <section class="mb-4">
-            <h2 class="h5 mb-2">
-                <a href="{{ users_url(type=UserQueryType.POPULAR) }}" class="link-body-emphasis">
-                    Popular creators
-                </a>
-            </h2>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <h2 class="h5 mb-0">Popular creators</h2>
+                <a href="{{ users_url(type=UserQueryType.POPULAR) }}" class="btn btn-light btn-sm">View all creators</a>
+            </div>
             {% if popular_users %}
-                <div id="popular-users" class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3 mb-2"
+                <div id="popular-users" class="{{ {"def": 1, "sm": 2, "lg": 3} | row_classes }} g-3 mb-2"
                      data-masonry='{"percentPosition": true }'>
                     {% with users=popular_users,
                             vert_gap=0,
@@ -95,9 +158,6 @@
                     {% endif %}
                 </div>
 
-                <a href="{{ users_url(type=UserQueryType.POPULAR) }}" class="btn btn-light btn-sm bi bi-heart">
-                    See all popular authors
-                </a>
             {% else %}
                 <div>N/A</div>
             {% endif %}
@@ -107,58 +167,11 @@
             {% include "fragments/become-an-author.html" %}
         {% endif %}
 
-        {% if show_popular_prompts %}
-            <section class="mb-4">
-                <h2 class="h5 mb-2">
-                    <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}" class="link-body-emphasis">
-                        Popular prompts
-                    </a>
-                </h2>
-                {% if popular_prompts %}
-                    <div id="popular-prompts" class="{{ {"def": 1, "sm": 2} | row_classes }} g-3 mb-2"
-                         data-masonry='{"percentPosition": true }'>
-                        {% with prompts=popular_prompts,
-                                preview=False,
-                                vert_gap=0,
-                                h_display_size=6,
-                                horizontal=True,
-                                prompt_img_sizes={"1400px": "86px", "1200px": "71px", "992px": "96px", "768px": "156px", "default": "100vw"} %}
-                            {% include "fragments/prompts.html" %}
-                        {% endwith %}
-                    </div>
-
-                    <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}"
-                       class="btn btn-light btn-sm bi bi-star">
-                        See all popular prompts
-                    </a>
-                    <a href="{{ prompts_url(type=PromptQueryType.POPULAR) }}"
-                       class="btn btn-light btn-sm bi bi-tags">
-                        Search popular prompts by tags
-                    </a>
-                {% else %}
-                    <div>N/A</div>
-                {% endif %}
-            </section>
-        {% endif %}
-
         <section class="mb-4">
-            <h2 class="h5 mb-2 text-decoration-underline">Latest comments</h2>
-            {% if latest_prompt_comments %}
-                <div id="latest-prompt-comments" class="{{ {"def": 1, "sm": 3} | row_classes }} g-3 mb-2"
-                     data-masonry='{"percentPosition": true }'>
-                    {% include "fragments/latest-prompt-comments.html" %}
-                </div>
-            {% else %}
-                <div>N/A</div>
-            {% endif %}
-        </section>
-
-        <section>
-            <h2 class="h5 mb-2">
-                <a href="{{ prompts_url() }}" class="link-body-emphasis">
-                    Latest prompts
-                </a>
-            </h2>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <h2 class="h5 mb-0">Latest prompts</h2>
+                <a href="{{ prompts_url(type=PromptQueryType.LATEST) }}" class="btn btn-light btn-sm">View latest prompts</a>
+            </div>
             {% if latest_prompts %}
                 <div id="prompts" class="{{ {"def": 1, "sm": 2, "lg": 3, "xl": 4} | row_classes }} g-3 mb-2"
                      data-masonry='{"percentPosition": true }'>
@@ -176,19 +189,129 @@
                     {% include "fragments/load-more-button.html" %}
                 {% endwith %}
 
-                <div>
-                    <a href="{{ prompts_url(type=PromptQueryType.LATEST) }}"
-                       class="btn btn-light btn-sm bi bi-clock">
-                        See all latest prompts
-                    </a>
-                    <a href="{{ prompts_url(type=PromptQueryType.LATEST) }}"
-                       class="btn btn-light btn-sm bi bi-tags">
-                        Search latest prompts by tags
-                    </a>
-                </div>
             {% else %}
                 <div>N/A</div>
             {% endif %}
         </section>
+
     </div>
+    <style>
+        .home-prompt-finder.tagify--select::after {
+            content: none;
+        }
+    </style>
+    <script>
+      // Find prompts through the existing category, tag, and model filters.
+      document.addEventListener("DOMContentLoaded", () => {
+        const input = document.getElementById("home-search")
+        if (!input || typeof Tagify === "undefined") return
+
+        const form = input.closest("form")
+        const status = document.getElementById(input.getAttribute("aria-describedby"))
+        const setStatus = message => {
+          status.textContent = message
+          status.classList.toggle("invisible", !message)
+        }
+        const categories = JSON.parse(input.dataset.categories)
+        const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[char])
+        const suggestion = (item, kind, param) => ({
+          value: `${param}:${item.slug || item.name}`,
+          name: item.name || item.slug,
+          slug: item.slug || item.name,
+          kind,
+          param
+        })
+        const finder = new Tagify(input, {
+          mode: "select",
+          enforceWhitelist: true,
+          tagTextProp: "name",
+          whitelist: [],
+          autoComplete: {enabled: false},
+          dropdown: {
+            enabled: 1,
+            maxItems: 12,
+            searchKeys: ["name", "slug"],
+            highlightFirst: true,
+            closeOnSelect: true
+          },
+          templates: {
+            dropdownItem(item) {
+              return `<div ${this.getAttributes(item)} class="tagify__dropdown__item d-flex justify-content-between align-items-center gap-3" tabindex="0" role="option"><span>${escapeHtml(item.name)}</span><span class="badge text-bg-secondary">${escapeHtml(item.kind)}</span></div>`
+            }
+          }
+        })
+        finder.DOM.scope.classList.add("home-prompt-finder", "align-items-center")
+        finder.DOM.input.setAttribute("aria-label", "Find prompts by category, tag, or model")
+        finder.DOM.input.setAttribute("aria-describedby", status.id)
+
+        let timer
+        let controller
+
+        finder.on("input", event => {
+          const query = event.detail.value.trim()
+          clearTimeout(timer)
+          controller?.abort()
+          finder.loading(false)
+          finder.whitelist = []
+          finder.dropdown.hide()
+          setStatus("")
+          if (query.length < 1) {
+            return
+          }
+
+          const local = categories
+            .filter(item => `${item.name} ${item.slug}`.toLowerCase().includes(query.toLowerCase()))
+            .slice(0, 4).map(item => suggestion(item, "Category", "category"))
+          finder.whitelist = local
+          if (local.length) finder.dropdown.show(query)
+          controller = new AbortController()
+          const signal = controller.signal
+
+          timer = setTimeout(async () => {
+            finder.loading(true)
+            const sources = [
+              {url: input.dataset.tagsUrl, kind: "Tag", param: "tags"},
+              {url: input.dataset.modelsUrl, kind: "Model", param: "model"}
+            ]
+            const responses = await Promise.allSettled(sources.map(async source => {
+              const url = new URL(source.url, window.location.origin)
+              url.searchParams.set("prefix", source.param === "tags" ? toKebabCase(query) : query.toLowerCase())
+              url.searchParams.set("limit", "4")
+              const response = await fetch(url, {signal})
+              if (!response.ok) throw new Error(`Catalog request failed: ${response.status}`)
+              const items = await response.json()
+              return items.map(item => suggestion(item, source.kind, source.param))
+            }))
+            if (signal.aborted) return
+
+            const matches = [...local, ...responses.flatMap(result => result.status === "fulfilled" ? result.value : [])]
+            finder.whitelist = matches
+            finder.loading(false)
+            if (matches.length) finder.dropdown.show(query)
+            else finder.dropdown.hide()
+            const failed = responses.some(result => result.status === "rejected")
+            setStatus(failed
+              ? "Some suggestions could not load. Try again."
+              : matches.length ? ""
+                : "No matching categories, tags, or models.")
+          }, 250)
+        })
+
+        finder.on("add", event => {
+          const item = event.detail.data
+          if (!["category", "tags", "model"].includes(item.param)) return
+          clearTimeout(timer)
+          controller?.abort()
+          const url = new URL(form.action, window.location.origin)
+          url.searchParams.set(item.param, item.slug)
+          window.location.assign(url.toString())
+        })
+        form.addEventListener("submit", event => {
+          event.preventDefault()
+          setStatus("Choose a category, tag, or model from the suggestions.")
+        })
+      });
+    </script>
 {% endblock %}
