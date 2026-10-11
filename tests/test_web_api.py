@@ -47,7 +47,8 @@ def get_user(client, user_alias) -> pq:
     doc = pq(resp.text)
     assert user["name"] in doc("head title").text()
     schema = json.loads(doc('script[type="application/ld+json"]').text())
-    assert schema["@type"] == "Person"
+    assert schema["@type"] == "ProfilePage"
+    assert schema["mainEntity"]["@type"] == "Person"
     assert schema["url"].startswith("http")
     assert schema["breadcrumb"]["itemListElement"][-1]["name"] == user["name"]
     assert all(value is not None for value in schema.values())
@@ -641,6 +642,16 @@ def test_public_query_endpoints_reject_invalid_parameters(guest_client, path):
     assert response.status_code == 422, (path, response.status_code, response.text)
 
 
+@pytest.mark.parametrize("path", [
+    "/seo-nonexistent-tag/prompts",
+    "/prompts?category=seo-nonexistent-category",
+    "/prompts?model=seo-nonexistent-model",
+])
+def test_empty_public_prompt_filters_return_not_found(guest_client, path):
+    response = guest_client.get(f"{WEB_TEST_BASE_URL}{path}", timeout=30)
+    assert response.status_code == 404
+
+
 def test_tags_fragment_endpoint_success(guest_client):
     response = get(guest_client, "/tags-fragment?type=latest&limit=6")
 
@@ -970,7 +981,11 @@ def test_prompt_read_edit_update_status_endpoints_success_and_failure(guest_clie
     assert read_success.status_code == 200, read_success.text
     read_doc = pq(read_success.text)
     prompt_schema = json.loads(read_doc('script[type="application/ld+json"]').text())
-    assert prompt_schema["@type"] == "Prompt"
+    assert prompt_schema["@type"] == "CreativeWork"
+    assert prompt_schema["text"]
+    assert prompt_schema["mainEntityOfPage"]["@type"] == "WebPage"
+    assert prompt_schema["publisher"]["@type"] == "Organization"
+    assert prompt_schema["publisher"]["@id"] != prompt_schema["author"]["@id"]
     assert prompt_schema["inLanguage"] == "en"
     assert prompt_schema["author"]["url"].endswith("/@root-functional")
     assert read_doc('meta[property="og:type"]').attr("content") == "article"

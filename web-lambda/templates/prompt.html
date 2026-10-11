@@ -5,9 +5,7 @@
 {% set template_language = "none" if prompt.template.format == "code" else prompt.template.format %}
 {% set layout_assets = {"masonry": true, "prism": true} %}
 {% set prompt_canonical_url = prompt_url(prompt, absolute=True) %}
-{% set prompt_alternate_url = url("prompt", prompt_id=prompt.id, absolute=True) %}
 {% set author_canonical_url = user_url(author, absolute=True) %}
-{% set author_alternate_url = url("user", user_id=author.id, absolute=True) %}
 {% set meta_desc = html_to_text(prompt.description) or html_to_text(prompt.template.content) or prompt.title %}
 {% set meta_title = prompt.title ~ " | " ~ site_name %}
 {% set meta_robots = "index, follow" %}
@@ -34,7 +32,7 @@
             "url": meta_canonical_url ~ "#" ~ comment_anchor,
             "author": {
                 "@type": "Person",
-                "@id": user_url(comment_user, absolute=True),
+                "@id": user_url(comment_user, absolute=True) ~ "#person",
                 "name": comment_user.name,
                 "url": user_url(comment_user, absolute=True)
             },
@@ -44,7 +42,7 @@
     {% endfor %}
     {% set author_schema = {
         "@context": "https://schema.org",
-        "@id": author_canonical_url,
+        "@id": author_canonical_url ~ "#person",
         "@type": "Person",
         "identifier": author.username or author.id,
         "name": author.name,
@@ -53,16 +51,15 @@
     } %}
     {% set prompt_schema = {
         "@context": "https://schema.org",
-        "@id": meta_canonical_url,
-        "@type": "Prompt",
+        "@id": meta_canonical_url ~ "#prompt",
+        "@type": "CreativeWork",
         "url": meta_canonical_url,
         "dateCreated": prompt.created_at | iso_utc,
         "datePublished": (prompt.published_at | iso_utc) if prompt.published_at else None,
         "headline": prompt.title,
         "name": prompt.title,
         "description": meta_desc,
-        "promptBody": prompt_body,
-        "wordCount": prompt_body.split() | length,
+        "text": prompt_body,
         "inLanguage": "en",
         "identifier": prompt.id,
         "commentCount": prompt.comments_count | int,
@@ -71,25 +68,27 @@
         "publisher": {
             "@context": "https://schema.org",
             "@type": "Organization",
-            "@id": author_schema["@id"],
-            "name": author_schema["name"],
-            "url": author_schema["url"],
+            "@id": url("index", absolute=True) ~ "#organization",
+            "name": site_name,
+            "url": url("index", absolute=True),
             "logo": {
                 "@type": "ImageObject",
                 "url": static_url(site_img_filename, absolute=True)
-            } if site_img_filename else None,
-            "sameAs": ([author_alternate_url] if author_canonical_url != author_alternate_url else [])
-                       + ([author.website] if author.website else [])
+            } if site_img_filename else None
         },
-        "mainEntityOfPage": meta_canonical_url,
         "isAccessibleForFree": not prompt.is_premium,
-        "breadcrumb": {
-            "@type": "BreadcrumbList",
-            "itemListElement": [
-                {"@type": "ListItem", "position": 1, "name": "Home", "item": url("index", absolute=True)},
-                {"@type": "ListItem", "position": 2, "name": "Prompts", "item": prompts_url(absolute=True)},
-                {"@type": "ListItem", "position": 3, "name": prompt.title, "item": meta_canonical_url}
-            ]
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": meta_canonical_url,
+            "url": meta_canonical_url,
+            "breadcrumb": {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {"@type": "ListItem", "position": 1, "name": "Home", "item": url("index", absolute=True)},
+                    {"@type": "ListItem", "position": 2, "name": "Prompts", "item": prompts_url(absolute=True)},
+                    {"@type": "ListItem", "position": 3, "name": prompt.title, "item": meta_canonical_url}
+                ]
+            }
         }
     } %}
     {% if prompt_image_url %}
@@ -101,7 +100,7 @@
     {% if comment_schemas.values %}
         {% set prompt_schema = prompt_schema.update({"comment": comment_schemas.values}) or prompt_schema %}
     {% endif %}
-    {% if prompt.updated_at and prompt.published_at and prompt.updated_at - prompt.published_at > 86_400_000 %}
+    {% if prompt.updated_at and prompt.published_at and prompt.updated_at >= prompt.published_at %}
         {% set prompt_schema = prompt_schema.update({"dateModified": prompt.updated_at | iso_utc}) or prompt_schema %}
     {% endif %}
     {{- prompt_schema | tojson | safe -}}

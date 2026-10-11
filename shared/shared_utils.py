@@ -709,7 +709,7 @@ def get_prompts_url(req, query: PromptQueryDTO | None = None, **params) -> str:
 
     tags = params.pop("tags", None)
     if tags:
-        slugs.extend(str(t) for t in tags if t)
+        slugs.extend(sorted({str(t) for t in tags if t}))
 
     status = params.pop("status", None)
     if status:
@@ -1897,14 +1897,16 @@ def decode_offset(token: str) -> dict | None:
 def get_prompts(query_dto: PromptQueryDTO = None, cur_user: User = None) -> list[Prompt]:
     if query_dto is None:
         query_dto = PromptQueryDTO()
-    if query_dto.model:
+    if query_dto.model or (query_dto.category and query_dto.tags):
+        fetch_page = (get_prompts_by_model if query_dto.model else
+                      get_popular_prompts if query_dto.type == PromptQueryType.POPULAR else get_latest_prompts)
         page_query = copy.copy(query_dto)
         prompts = []
         wanted_tags = set(query_dto.tags)
         continuation_offset = None
         while len(prompts) < query_dto.limit:
             page_query.limit = query_dto.limit - len(prompts)
-            page = get_prompts_by_model(page_query, cur_user)
+            page = fetch_page(page_query, cur_user)
             if not page:
                 break
             next_offset = page[-1].offset
@@ -1921,13 +1923,9 @@ def get_prompts(query_dto: PromptQueryDTO = None, cur_user: User = None) -> list
             prompts[-1].offset = continuation_offset
         return prompts
     if query_dto.category:
-        prompts = (get_popular_prompts(query_dto, cur_user)
-                   if query_dto.type == PromptQueryType.POPULAR
-                   else get_latest_prompts(query_dto, cur_user))
-        if query_dto.tags:
-            wanted_tags = set(query_dto.tags)
-            prompts = [prompt for prompt in prompts if wanted_tags.issubset(set(prompt.tags))]
-        return prompts
+        return (get_popular_prompts(query_dto, cur_user)
+                if query_dto.type == PromptQueryType.POPULAR
+                else get_latest_prompts(query_dto, cur_user))
     if query_dto.type == PromptQueryType.POPULAR:
         if query_dto.tags:
             return get_popular_prompts_by_tags(query_dto, cur_user)

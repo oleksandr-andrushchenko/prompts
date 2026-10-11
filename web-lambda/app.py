@@ -4,7 +4,7 @@ from app_config import (
     get_allowed_origins, get_indexnow_key, get_static_files_dir, is_prod,
 )
 from notifications import get_access_log
-from query_dtos import TagQueryDTO
+from query_dtos import PromptStatus, TagQueryDTO
 from shared_deps import (
     OptCurUserDep,
     CurUserDep,
@@ -327,6 +327,9 @@ async def _prompts_page(query_dto: PromptQueryDep, cur_user: OptCurUserDep) -> H
         (category for category in categories if category.slug == query_dto.category),
         None,
     )
+    if (query_dto.status == PromptStatus.PUBLISHED and not prompts
+            and (query_dto.tags or query_dto.category or query_dto.model or query_dto.offset)):
+        raise HTTPException(status_code=404, detail="No prompts match this page or filter combination.")
     return get_html_content("prompts.html", {
         "cur_user": cur_user,
         "prompt_query": query_dto,

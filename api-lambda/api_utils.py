@@ -2,6 +2,7 @@ from dataclasses import replace
 from html.parser import HTMLParser
 from http import HTTPStatus
 from urllib.parse import unquote, urlparse
+from xml.etree.ElementTree import Element, SubElement, tostring
 
 from app_config import (
     get_aws_region, get_cloudfront_distribution_id, get_config, get_contact_topic_arn,
@@ -14,12 +15,13 @@ from prompt_dtos import (
     PromptCommentDTO, PromptDTO, UpdatePromptCommentDTO, UpdatePromptDTO, UpdatePromptImpressionDTO,
     UpdatePromptStatusDTO, UpdateTagDTO,
 )
+from query_dtos import ModelQueryDTO
 from search_engine_submissions import notify_search_engines, submit_sitemap_to_search_engines
 from shared_utils import *
 from shared_utils import (
     Category, Key, Permission, User, add_update_category_published_count_transact,
     find_prompt, find_prompt_by_slug_follow_redirects,
-    find_user_by_username_follow_redirects, get_categories, get_prompts, get_tags,
+    find_user_by_username_follow_redirects, get_categories, get_models, get_prompts, get_tags,
     logger, query_dynamodb_table,
 )
 from tag_subscription_dtos import TagSubscriptionDTO
@@ -227,105 +229,126 @@ def safe_execute(label: str, func, *args, **kwargs):
         return None
 
 
+SITEMAP_MAX_URLS = 50_000
+SITEMAP_MAX_BYTES = 50 * 1024 * 1024
+SITEMAP_NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9"
+
+
+def _save_sitemap(entries, req) -> tuple[int, str]:
+    """Write bounded URL sets, using a sitemap index only when needed."""
+    header = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="{SITEMAP_NAMESPACE}">'.encode()
+    footer = b"</urlset>"
+    parts, sitemap_files = [], []
+    size = len(header) + len(footer)
+    total = 0
+
+    def save(filename):
+        return save_public_file(
+            FileDTO(content=header + b"".join(parts) + footer, filename=filename),
+            filename=filename,
+        )
+
+    for loc, modified in entries:
+        node = Element("url")
+        SubElement(node, "loc").text = loc
+        if modified:
+            SubElement(node, "lastmod").text = modified
+        entry = tostring(node, encoding="utf-8")
+        if len(header) + len(entry) + len(footer) > SITEMAP_MAX_BYTES:
+            raise ValueError("A sitemap entry exceeds the sitemap size limit")
+        if parts and (len(parts) >= SITEMAP_MAX_URLS or size + len(entry) > SITEMAP_MAX_BYTES):
+            sitemap_files.append(save(f"sitemap-{len(sitemap_files) + 1}.xml"))
+            parts = []
+            size = len(header) + len(footer)
+        parts.append(entry)
+        size += len(entry)
+        total += 1
+
+    if not sitemap_files:
+        filename = save("sitemap.xml")
+    else:
+        if parts:
+            sitemap_files.append(save(f"sitemap-{len(sitemap_files) + 1}.xml"))
+        index = Element("sitemapindex", xmlns=SITEMAP_NAMESPACE)
+        for filename in sitemap_files:
+            node = SubElement(index, "sitemap")
+            SubElement(node, "loc").text = get_static_url(req, filename, absolute=True)
+        filename = save_public_file(
+            FileDTO(content=tostring(index, encoding="utf-8", xml_declaration=True), filename="sitemap.xml"),
+            filename="sitemap.xml",
+        )
+    return total, get_static_url(req, filename, absolute=True)
+
+
 def generate_sitemap(user: User, req) -> tuple[int, str]:
     verify_authorization(user, Permission.GENERATE_SITEMAP)
-
-    today = datetime.utcnow().date().isoformat()
 
     def lastmod(ts_ms, fallback_ts_ms=None):
         ts_ms = ts_ms or fallback_ts_ms
         if not ts_ms:
-            return today
+            return None
         return datetime.fromtimestamp(
             float(ts_ms) / 1000,
             tz=timezone.utc
         ).date().isoformat()
 
-    urls = []
-
-    # Static
-    def url(route: str) -> str:
-        return get_url(req, route, True)
-
-    urls.extend([
-        (url("index"), today),
-        (url("tags"), today),
-        (url("models"), today),
-        (url("categories"), today),
-        (url("contacts"), today),
-        (url("rules"), today),
-        (url("terms"), today),
-        (url("earn"), today),
-    ])
-
-    # Prompt lists
-    def prompts_url(tp: PromptQueryType, tg: Tag | None = None,
-                    category: Category | None = None) -> str:
-        return get_prompts_url(
-            req,
-            type=tp,
-            tags=[tg.slug] if tg else [],
-            category=category.slug if category else None,
-            absolute=True,
-        )
-
-    sitemap_tags = get_tags(TagQueryDTO(limit=1000))
-    sitemap_categories = get_categories()
-    for type_ in PromptQueryType:
-        urls.append((prompts_url(type_), today))
-        for tag in sitemap_tags:
-            if tag.prompts_count > 0:
-                urls.append((prompts_url(type_, tag), today))
-        for category in sitemap_categories:
+    def entries():
+        for route in ("index", "tags", "models", "categories", "contacts", "policy", "rules", "terms", "earn"):
+            yield get_url(req, route, True), None
+        for type_ in PromptQueryType:
+            yield get_prompts_url(req, type=type_, absolute=True), None
+        for category in get_categories():
             if category.published_prompts_count > 0:
-                urls.append((prompts_url(type_, category=category), today))
+                for type_ in PromptQueryType:
+                    yield get_prompts_url(req, type=type_, category=category.slug, absolute=True), None
 
-    # Prompts
-    def prompt_url(prompt: Prompt) -> str:
-        return get_prompt_url(req, prompt, absolute=True)
+        offset = None
+        while tags := get_tags(TagQueryDTO(limit=1000, offset=offset)):
+            for tag in tags:
+                if tag.prompts_count > 0:
+                    for type_ in PromptQueryType:
+                        yield get_prompts_url(req, type=type_, tags=[tag.slug], absolute=True), None
+            offset = tags[-1].offset
+            if not offset:
+                break
 
-    offset = None
-    while prompts := get_latest_prompts(PromptQueryDTO(status=PromptStatus.PUBLISHED, limit=1000, offset=offset)):
-        urls.extend([(prompt_url(prompt), lastmod(prompt.updated_at, prompt.created_at)) for prompt in prompts])
-        offset = prompts[-1].offset
-        if not offset:
-            break
+        offset = None
+        while models := get_models(ModelQueryDTO(limit=1000, offset=offset)):
+            for model in models:
+                if model.published_prompts_count > 0:
+                    for type_ in PromptQueryType:
+                        yield get_prompts_url(req, type=type_, model=model.slug, absolute=True), None
+            offset = models[-1].offset
+            if not offset:
+                break
 
-    # User lists
-    def users_url(tp: UserQueryType) -> str:
-        return get_users_url(req, type=tp, absolute=True)
+        offset = None
+        while prompts := get_latest_prompts(PromptQueryDTO(status=PromptStatus.PUBLISHED, limit=1000, offset=offset)):
+            for prompt in prompts:
+                yield get_prompt_url(req, prompt, absolute=True), lastmod(prompt.updated_at, prompt.published_at or prompt.created_at)
+            offset = prompts[-1].offset
+            if not offset:
+                break
 
-    for type_ in UserQueryType:
-        urls.append((users_url(type_), today))
+        for type_ in UserQueryType:
+            yield get_users_url(req, type=type_, absolute=True), None
+        offset = None
+        while users := get_latest_users(UserQueryDTO(status=UserStatus.ACTIVE, limit=1000, offset=offset)):
+            for creator in users:
+                yield get_user_url(req, creator, absolute=True), lastmod(creator.updated_at, creator.created_at)
+            offset = users[-1].offset
+            if not offset:
+                break
 
-    # Users
-    def user_url(user_: User) -> str:
-        return get_user_url(req, user_, absolute=True)
-
-    offset = None
-    while users := get_latest_users(
-            UserQueryDTO(status=UserStatus.ACTIVE, limit=1000, offset=offset)):
-        urls.extend([(user_url(user), lastmod(user.updated_at, user.created_at)) for user in users])
-        offset = users[-1].offset
-        if not offset:
-            break
-
-    # Save
-    sitemap_xml = f"""<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{''.join([f"""<url><loc>{loc}</loc><lastmod>{lastmod}</lastmod></url>""" for (loc, lastmod) in urls])}</urlset>"""
-
-    sitemap_filename = save_public_file(
-        FileDTO(content=sitemap_xml.encode("utf-8"), filename="sitemap.xml"),
-        filename="sitemap.xml",
-    )
-    sitemap_url = get_static_url(req, sitemap_filename, absolute=True)
+    urls_count, sitemap_url = _save_sitemap(entries(), req)
 
     # Invalidate CDN cache
     if is_prod():
-        safe_execute("CF invalidation", _drop_cdn_cache, ["/sitemap.xml"])
+        safe_execute("CF invalidation", _drop_cdn_cache, ["/sitemap*"])
 
     safe_execute("Sitemap submission", submit_sitemap_to_search_engines, sitemap_url)
 
-    return len(urls), sitemap_url
+    return urls_count, sitemap_url
 
 
 def create_tag_subscription(dto: TagSubscriptionDTO, user: User) -> TagSubscription:

@@ -123,7 +123,7 @@ class PromptQueryDTO(BaseQueryDTO):
         BaseQueryDTO.__post_init__(self)
         self.type = PromptQueryType(self.type)
         self.status = PromptStatus(self.status)
-        self.tags = [tag for tag in self.tags if tag]
+        self.tags = sorted({tag for tag in self.tags if tag})
         if self.category == "":
             self.category = None
         if self.model == "":

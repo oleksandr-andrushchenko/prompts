@@ -38,13 +38,27 @@
     {% set user_schema = {
         "@context": "https://schema.org",
         "@type": "Person",
-        "@id": meta_canonical_url,
+        "@id": user_canonical_url ~ "#person",
         "identifier": user.username or user.id,
         "name": user.name,
-        "url": meta_canonical_url,
+        "url": user_canonical_url,
         "description": [user.headline, html_to_text(user.about)] | select | join('. '),
-        "sameAs": same_as,
-        "mainEntityOfPage": meta_canonical_url,
+        "sameAs": same_as
+    } %}
+    {% if user.headline %}
+        {% set user_schema = user_schema.update({"jobTitle": user.headline}) or user_schema %}
+    {% endif %}
+    {% if user.image_filename %}
+        {% set user_schema = user_schema.update({"image": static_url(user.image_filename, absolute=True)}) or user_schema %}
+    {% endif %}
+    {{- {
+        "@context": "https://schema.org",
+        "@type": "ProfilePage",
+        "@id": meta_canonical_url,
+        "url": meta_canonical_url,
+        "name": user.name,
+        "description": meta_desc,
+        "mainEntity": user_schema,
         "breadcrumb": {
             "@type": "BreadcrumbList",
             "itemListElement": [
@@ -53,14 +67,7 @@
                 {"@type": "ListItem", "position": 3, "name": user.name, "item": meta_canonical_url}
             ]
         }
-    } %}
-    {% if user.headline %}
-        {% set user_schema = user_schema.update({"jobTitle": user.headline}) or user_schema %}
-    {% endif %}
-    {% if user.image_filename %}
-        {% set user_schema = user_schema.update({"image": static_url(user.image_filename, absolute=True)}) or user_schema %}
-    {% endif %}
-    {{- user_schema | tojson | safe -}}
+    } | tojson | safe -}}
 {% endblock %}
 
 {% block breadcrumbs %}

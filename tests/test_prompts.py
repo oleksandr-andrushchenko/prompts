@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import pytest
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -211,3 +212,28 @@ def test_model_query_continues_until_other_filters_match(monkeypatch):
 
     assert [item.id for item in result] == ["match"]
     assert offsets == [None, "next"]
+
+
+@pytest.mark.parametrize("sort", ["latest", "popular"])
+def test_category_tag_query_continues_until_matches_and_preserves_cursor(monkeypatch, sort):
+    pages = {
+        None: [SimpleNamespace(id="wrong-tag", category="code-dev", tags=["other"], offset="next")],
+        "next": [SimpleNamespace(id="match", category="code-dev", tags=["wanted"], offset="remaining")],
+    }
+    offsets = []
+
+    def fetch(query, _cur_user):
+        offsets.append(query.offset)
+        return pages[query.offset]
+
+    monkeypatch.setattr(shared_utils, "get_latest_prompts" if sort == "latest" else "get_popular_prompts", fetch)
+    query = PromptQueryDTO(category="code-dev", tags=["wanted"], limit=1, type=sort)
+    result = shared_utils.get_prompts(query)
+    assert [item.id for item in result] == ["match"]
+    assert result[-1].offset == "remaining"
+    assert offsets == [None, "next"]
+    assert query.offset is None
+
+
+def test_prompt_query_has_stable_unique_tag_order():
+    assert PromptQueryDTO(tags=["z", "a", "z", ""]).tags == ["a", "z"]
