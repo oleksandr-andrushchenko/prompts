@@ -183,6 +183,7 @@
 
                 {% with limit=latest_prompts_query.limit,
                         offset=latest_prompts[-1].offset,
+                        next_page_url=prompts_url(query=latest_prompts_query, offset=latest_prompts[-1].offset),
                         url=url("prompts-fragment", absolute=True, **latest_prompts_query.get_dict()),
                         container="#prompts",
                         auto_click=True %}

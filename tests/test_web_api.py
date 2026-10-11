@@ -664,10 +664,20 @@ def test_models_page_metadata_and_auto_loading(guest_client):
     schema = json.loads(doc('script[type="application/ld+json"]').text())
     assert doc("main h1").text() == "Models"
     assert schema["@type"] == "CollectionPage"
-    assert schema["url"].endswith("/models")
+    assert schema["url"].endswith("/models?limit=6")
     assert doc("#models .model").length == 6
     load_more = doc('.btn-load-more[data-auto-click][data-container="#models"]')
     assert load_more.length == 1
+    assert load_more.is_("a[rel='next'][href]")
+
+    full_next_page = guest_client.get(f"{WEB_TEST_BASE_URL}{load_more.attr('href')}", timeout=30)
+    assert full_next_page.status_code == 200
+    full_next_doc = pq(full_next_page.text)
+    assert full_next_doc("main h1").text() == "Models"
+    assert full_next_doc("#models .model").length == 6
+    assert full_next_doc('link[rel="canonical"]').attr("href").endswith(load_more.attr("href"))
+    first_page = full_next_doc('a:contains("Back to first page")')
+    assert first_page.attr("href") == "/models?limit=6"
 
     next_page = guest_client.get(
         load_more.attr("data-url"),
@@ -677,6 +687,7 @@ def test_models_page_metadata_and_auto_loading(guest_client):
     assert next_page.status_code == 200
     next_doc = pq(next_page.text)
     assert next_doc(".model").length == 6
+    assert next_doc(".model h3").text() == full_next_doc("#models .model h3").text()
     assert doc("#models .model h3").eq(-1).text() < next_doc(".model h3").eq(0).text()
 
 

@@ -368,8 +368,10 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
 
 // Load more
 (() => {
-  $(document).on("click", ".btn-load-more", async function () {
+  $(document).on("click", ".btn-load-more", async function (event) {
     const btn = this
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return
+    event.preventDefault()
     if (btn.disabled) return
 
     const container = document.querySelector(btn.dataset.container)
@@ -422,6 +424,11 @@ function handleFormSubmit(formSelector, submitUrl, options = {}) {
       }
 
       btn.dataset.offset = newOffset
+      if (btn.hasAttribute("href")) {
+        const nextPageUrl = new URL(btn.href)
+        nextPageUrl.searchParams.set("offset", newOffset)
+        btn.href = nextPageUrl.toString()
+      }
     } catch (err) {
       console.error(err)
     } finally {

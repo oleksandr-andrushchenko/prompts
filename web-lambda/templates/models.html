@@ -4,7 +4,8 @@
 {% set subtitle = "AI models supported by catalog prompts" %}
 {% set meta_title = "AI Models & Prompt Templates | " ~ site_name %}
 {% set meta_robots = "index, follow" %}
-{% set meta_canonical_url = url("models", absolute=True) %}
+{% set page_params = models_query.get_dict({"limit": None if models_query.limit == models_query.DEFAULT_LIMIT else models_query.limit}) %}
+{% set meta_canonical_url = url("models", absolute=True, **page_params) %}
 {% set meta_desc = "Browse AI models on " ~ site_name ~ ". Find prompts and reusable templates for the model you use, with example results to help you choose." %}
 
 {% block meta_schema %}
@@ -58,6 +59,8 @@
 
         {% with limit=models_query.limit,
                 offset=models[-1].offset,
+                next_page_url=url("models", **dict(page_params, offset=models[-1].offset)),
+                first_page_url=url("models", **dict(page_params, offset=None)) if models_query.offset else None,
                 url=url("models-fragment", absolute=True, **models_query.get_dict()),
                 container="#models",
                 auto_click=True %}

@@ -127,6 +127,8 @@
 
         {% with limit=user_query.limit,
             offset=users[-1].offset,
+            next_page_url=users_url(query=user_query, offset=users[-1].offset),
+            first_page_url=users_url(query=user_query, offset=None) if user_query.offset else None,
             url=url("users-fragment", absolute=True, **user_query.get_dict()),
             container="#users",
             auto_click=True %}

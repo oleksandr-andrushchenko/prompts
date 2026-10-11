@@ -11,7 +11,11 @@
 {% set subtitle = ([val_map[tags_query.type]["subtitle"], "Tags"]) | select | join(" ") | title %}
 {% set meta_title = title ~ " for AI Prompts | " ~ site_name %}
 {% set meta_robots = "index, follow" %}
-{% set meta_canonical_url = url("tags", type=None if tags_query.type == TagQueryDTO.DEFAULT_TYPE else tags_query.type, absolute=True) %}
+{% set page_params = tags_query.get_dict({
+    "type": None if tags_query.type == TagQueryDTO.DEFAULT_TYPE else tags_query.type,
+    "limit": None if tags_query.limit == TagQueryDTO.DEFAULT_LIMIT else tags_query.limit
+}) %}
+{% set meta_canonical_url = url("tags", absolute=True, **page_params) %}
 {% set meta_desc = "Browse " ~ title ~ " on " ~ site_name ~ ". Discover AI prompts by topic and find reusable templates for your next task." %}
 
 {% block meta_schema %}
@@ -105,6 +109,8 @@
 
         {% with limit=tags_query.limit,
                 offset=tags[-1].offset,
+                next_page_url=url("tags", **dict(page_params, offset=tags[-1].offset)),
+                first_page_url=url("tags", **dict(page_params, offset=None)) if tags_query.offset else None,
                 url=url("tags-fragment", absolute=True, **tags_query.get_dict()),
                 container="#tags",
                 auto_click=True %}

@@ -3,7 +3,12 @@
 {% set main_class = "" %}
 {% set user_canonical_url = user_url(user, absolute=True) %}
 {% set user_alternate_url = url("user", user_id=user.id, absolute=True) %}
-{% set meta_canonical_url = user_canonical_url %}
+{% set page_params = prompt_query.get_dict({
+    "type": None if prompt_query.type == PromptQueryDTO.DEFAULT_TYPE else prompt_query.type,
+    "status": None if prompt_query.status == PromptQueryDTO.DEFAULT_STATUS else prompt_query.status,
+    "limit": None if prompt_query.limit == PromptQueryDTO.DEFAULT_LIMIT else prompt_query.limit
+}) %}
+{% set meta_canonical_url = user_url(user, absolute=True, **page_params) %}
 {% set og_type = "profile" %}
 {% set og_url = meta_canonical_url %}
 {% set og_img_filename = user.image_filename %}
@@ -244,6 +249,8 @@
 
                 {% with limit=prompt_query.limit,
                         offset=prompts[-1].offset,
+                        next_page_url=user_url(user, **dict(page_params, offset=prompts[-1].offset)),
+                        first_page_url=user_url(user, **dict(page_params, offset=None)) if prompt_query.offset else None,
                         url=url("user-prompts-fragment", user_id=user.id, absolute=True, **prompt_query.get_dict()),
                         container="#prompts" %}
                     {% include "fragments/load-more-button.html" %}

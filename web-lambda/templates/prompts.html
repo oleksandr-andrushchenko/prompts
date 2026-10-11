@@ -260,6 +260,8 @@
 
         {% with limit=prompt_query.limit,
             offset=prompts[-1].offset,
+            next_page_url=prompts_url(query=prompt_query, offset=prompts[-1].offset),
+            first_page_url=prompts_url(query=prompt_query, offset=None) if prompt_query.offset else None,
             url=url("prompts-fragment", absolute=True, **prompt_query.get_dict()),
             container="#prompts",
             auto_click=True %}
